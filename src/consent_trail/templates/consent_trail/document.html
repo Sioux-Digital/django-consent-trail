@@ -1,0 +1,44 @@
+{% extends base_template %}
+{% load i18n %}
+
+{% block title %}{{ doc.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+
+      <h1 class="h3 mb-2">{{ doc.title }}</h1>
+      <p class="text-secondary small mb-4">
+        {% trans "Version" %} {{ doc.version }}
+        {% if doc.published_at %}— {% trans "in force since" %} {{ doc.published_at|date:"d/m/Y" }}{% endif %}
+      </p>
+
+      {% if is_fallback %}
+        <div class="alert alert-info" role="alert">
+          {% blocktrans %}This document is not available in your language. Only the French version is authoritative.{% endblocktrans %}
+        </div>
+      {% endif %}
+
+      <article class="ct-body">{{ body }}</article>
+
+      <hr class="my-4">
+      <p class="small text-secondary d-print-none">
+        <a href="javascript:window.print()">{% trans "Print or save as PDF" %}</a>
+      </p>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  .ct-body h2 { font-size: 1.25rem; margin-top: 2rem; }
+  .ct-body h3 { font-size: 1.05rem; margin-top: 1.5rem; }
+  .ct-body table { width: 100%; margin: 1rem 0; }
+  .ct-body th, .ct-body td { border: 1px solid #dee2e6; padding: .4rem .6rem; }
+  @media print {
+    .d-print-none, nav, footer { display: none !important; }
+    .ct-body { font-size: 11pt; }
+  }
+</style>
+{% endblock %}

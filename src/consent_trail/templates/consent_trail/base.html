@@ -1,0 +1,13 @@
+{# Bare fallback so the app renders standalone. Host projects override
+   it via CONSENT_TRAIL_BASE_TEMPLATE — e.g. "myproject/base.html". #}
+{% load i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% trans "Legal" %}{% endblock %}</title>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>

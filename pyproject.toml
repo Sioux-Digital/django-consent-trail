@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-consent-trail"
+version = "0.1.0.dev0"
+description = "Versioned, multilingual legal documents for Django — with timestamped proof of who accepted what, and when."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "William Touzalin" }]
+keywords = ["django", "gdpr", "rgpd", "terms", "consent", "legal", "privacy", "audit"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "Django>=4.2",
+    "nh3>=0.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/Sioux-Digital/django-consent-trail"
+Issues = "https://github.com/Sioux-Digital/django-consent-trail/issues"
+Changelog = "https://github.com/Sioux-Digital/django-consent-trail/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/consent_trail"]
