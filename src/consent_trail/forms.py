@@ -27,7 +27,9 @@ class ConsentForm(forms.Form):
 
     def record_consent(self, user, request=None):
         """Write one acceptance row per document currently requiring consent."""
-        for doc_type, version in LegalDocument.acceptance_required().items():
+        # No audience at signup: the user has no memberships yet, so only
+        # untargeted documents can meaningfully be presented.
+        for doc_type, version in LegalDocument.acceptance_required(user).items():
             Acceptance.record(user, doc_type, version, request=request)
 
     # django-allauth calls this after the user row exists.

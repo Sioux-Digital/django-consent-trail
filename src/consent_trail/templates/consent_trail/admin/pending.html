@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<h1>{% trans "Pending acceptances" %}</h1>
+<p class="help">
+  {% blocktrans %}Users who have not yet accepted the current version of each document.{% endblocktrans %}
+</p>
+
+<form method="get" style="margin:1rem 0;">
+  <label for="doc">{% trans "Document" %}:</label>
+  <select name="doc" id="doc" onchange="this.form.submit()">
+    <option value="">{% trans "All" %}</option>
+    {% for value, label in doc_choices %}
+      <option value="{{ value }}" {% if value == selected %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit">{% trans "Filter" %}</button></noscript>
+</form>
+
+{% for block in blocks %}
+  <div class="module" style="margin-bottom:1.5rem;">
+    <h2>
+      {{ block.label }} — {% trans "version" %} {{ block.version }}
+      {% if block.audience %}
+        <span style="font-weight:normal;">({% trans "audience" %}: <code>{{ block.audience }}</code>)</span>
+      {% endif %}
+      — <strong>{{ block.total }}</strong> {% trans "pending" %}
+    </h2>
+
+    {% if block.page.object_list %}
+      <table style="width:100%;">
+        <thead><tr><th>{% trans "User" %}</th><th>{% trans "Email" %}</th></tr></thead>
+        <tbody>
+          {% for u in block.page.object_list %}
+            <tr><td>{{ u.get_username }}</td><td>{{ u.email|default:"—" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if block.page.has_other_pages %}
+        <p class="paginator">
+          {% if block.page.has_previous %}
+            <a href="?doc={{ selected }}&amp;page={{ block.page.previous_page_number }}">{% trans "previous" %}</a>
+          {% endif %}
+          {% blocktrans with n=block.page.number t=block.page.paginator.num_pages %}page {{ n }} of {{ t }}{% endblocktrans %}
+          {% if block.page.has_next %}
+            <a href="?doc={{ selected }}&amp;page={{ block.page.next_page_number }}">{% trans "next" %}</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    {% else %}
+      <p style="padding:.75rem;">{% trans "Everyone has accepted this version." %}</p>
+    {% endif %}
+  </div>
+{% empty %}
+  <p>{% trans "No document currently requires acceptance." %}</p>
+{% endfor %}
+{% endblock %}

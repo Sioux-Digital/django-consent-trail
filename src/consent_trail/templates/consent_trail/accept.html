@@ -10,7 +10,7 @@
 
       <h1 class="h4 mb-3">{% trans "Our terms have changed" %}</h1>
       <p class="text-secondary">
-        {% blocktrans %}Please review the documents below and accept them to continue.{% endblocktrans %}
+        {% blocktrans %}Please read the documents below and accept them to continue.{% endblocktrans %}
       </p>
 
       {% if error %}
@@ -19,29 +19,85 @@
         </div>
       {% endif %}
 
-      <ul class="mb-4">
-        {% for doc in documents %}
-          <li>
-            <a href="{% url 'consent_trail:document' doc.doc_type %}" target="_blank" rel="noopener">
-              {{ doc.title }}</a>
-            <span class="text-secondary small">({% trans "version" %} {{ doc.version }})</span>
-          </li>
-        {% endfor %}
-      </ul>
-
-      <form method="post">
+      <form method="post" id="ct-form">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next }}">
+
+        {% for item in documents %}
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <strong>{{ item.doc.title }}</strong>
+              <a href="{% url 'consent_trail:document' item.doc.doc_type %}"
+                 target="_blank" rel="noopener" class="small">
+                {% trans "Open in a new tab" %}
+              </a>
+            </div>
+            {# Scrollable so the text is genuinely presented, not just linked.
+               Reaching the bottom is what enables the checkbox below. #}
+            <div class="card-body ct-scroll" data-ct-scroll
+                 style="max-height:320px; overflow-y:auto;">
+              <div class="ct-body">{{ item.body }}</div>
+            </div>
+          </div>
+        {% endfor %}
+
         <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" name="accept" id="accept" value="1">
-          <label class="form-check-label" for="accept">
+          <input class="form-check-input" type="checkbox" name="accept" id="ct-accept" value="1">
+          <label class="form-check-label" for="ct-accept">
             {% trans "I have read and accept these documents." %}
           </label>
+          <div class="form-text" id="ct-hint">
+            {% trans "Scroll to the end of each document to enable this." %}
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary">{% trans "Accept and continue" %}</button>
+
+        <button type="submit" class="btn btn-primary" id="ct-submit">
+          {% trans "Accept and continue" %}
+        </button>
       </form>
 
     </div>
   </div>
 </div>
+
+<style>
+  .ct-body h2 { font-size: 1.15rem; margin-top: 1.5rem; }
+  .ct-body h3 { font-size: 1rem; margin-top: 1.2rem; }
+  .ct-body table { width: 100%; margin: .75rem 0; }
+  .ct-body th, .ct-body td { border: 1px solid #dee2e6; padding: .35rem .5rem; }
+</style>
+
+<script>
+/* Enable the checkbox only once every document has been scrolled to its end.
+ * Progressive enhancement: with JavaScript off the checkbox simply stays
+ * usable, because the server is what actually enforces consent. Never gate a
+ * legal requirement on client-side code alone.
+ */
+(function () {
+  var panes = Array.prototype.slice.call(document.querySelectorAll('[data-ct-scroll]'));
+  var box = document.getElementById('ct-accept');
+  var hint = document.getElementById('ct-hint');
+  if (!panes.length || !box) return;
+
+  var seen = new Array(panes.length).fill(false);
+
+  function check(i, el) {
+    // A pane shorter than its max-height never scrolls — count it as read.
+    if (el.scrollHeight - el.clientHeight <= 2) { seen[i] = true; return; }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) seen[i] = true;
+  }
+
+  function refresh() {
+    var all = seen.every(Boolean);
+    box.disabled = !all;
+    hint.hidden = all;
+  }
+
+  panes.forEach(function (el, i) {
+    check(i, el);
+    el.addEventListener('scroll', function () { check(i, el); refresh(); }, { passive: true });
+  });
+  refresh();
+})();
+</script>
 {% endblock %}

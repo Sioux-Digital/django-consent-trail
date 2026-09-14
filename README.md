@@ -89,6 +89,68 @@ others. Falls back to `REMOTE_ADDR` when the header is absent.
 > Only trust a forwarding header you control end to end: a client can forge one
 > if requests can reach your app without passing through your proxy.
 
+## How this relates to Django's i18n
+
+`consent_trail` **complements** `django.utils.translation`, it does not replace
+it, and the two handle different things:
+
+| | Handled by |
+|---|---|
+| Interface strings — buttons, labels, the prevalence notice | Django i18n, `.po` files |
+| Document bodies — the actual contract text | This package, in the database |
+
+**Document text deliberately never goes through `.po` files.** Three reasons:
+
+1. A `.po` msgid is a UI string. A contract is thousands of words with its own
+   revision history — `makemessages` would flood your catalogue and a single
+   comma change would mark the whole thing fuzzy.
+2. Legal text needs a *version number* and a *date of entry into force*,
+   independently of the code. `.po` files have neither.
+3. Machine-translating a contract is a real liability: a diverging translation
+   can be held against you.
+
+So each language is its own row, written and reviewed by a human, sharing one
+version number with its siblings. A document with no version in the requested
+language falls back to `CONSENT_TRAIL_FALLBACK_LANGUAGE` and displays a
+prevalence notice saying which version is authoritative.
+
+Setting up i18n in the host project is unchanged: put the package's URLs inside
+`i18n_patterns()` if you want language-prefixed paths, and the current
+`get_language()` drives which version is served.
+
+```python
+urlpatterns += i18n_patterns(
+    path("legal/", include("consent_trail.urls")),
+)
+```
+
+> Note: with `prefix_default_language=False`, your default language has no URL
+> prefix — `/legal/cgu/` rather than `/en/legal/cgu/`. That is Django's
+> behaviour, not this package's.
+
+## Targeting a subset of users
+
+Re-acceptance can be aimed at part of your user base — one organisation, one
+plan, one country — without this package knowing what those are.
+
+```python
+# settings.py
+CONSENT_TRAIL_AUDIENCE_RESOLVER = "myapp.legal.resolve_audience"
+```
+
+```python
+# myapp/legal.py
+def resolve_audience(user):
+    return {f"org:{m.organization_id}" for m in user.memberships.all()}
+```
+
+Then set a document's `audience` to `org:3f2b…`. Leave `audience` empty — the
+default — and the document applies to everyone, which covers the common
+"make all users re-accept" case with no configuration at all.
+
+A resolver that raises degrades to "no tags": targeted documents are skipped
+rather than trapping every user on the acceptance screen.
+
 ## Consent at signup
 
 With django-allauth:
@@ -100,6 +162,19 @@ ACCOUNT_SIGNUP_FORM_CLASS = "consent_trail.forms.ConsentForm"
 Any other stack: call `form.record_consent(user, request=request)` once the
 user row exists. Validation is server-side — an HTML `required` attribute only
 stops a browser.
+
+## What users and admins get
+
+- **Acceptance screen** — documents rendered inline in scrollable panes; the
+  checkbox only enables once each has been scrolled to its end. Progressive
+  enhancement: with JavaScript off the checkbox stays usable, because the
+  server is what enforces consent. Never gate a legal requirement on
+  client-side code alone.
+- **`/my-consents/`** — what this user accepted and when, superseded versions
+  included. The proof belongs to them too.
+- **Admin → Acceptances → `pending/`** — who has *not* accepted the current
+  version, per document and per audience. Collecting consent is only half the
+  job; being able to answer "who is missing?" is the other half.
 
 ## Data model
 

@@ -9,13 +9,14 @@ from django.utils.translation import get_language
 from . import conf
 from .models import DocType, Acceptance, LegalDocument
 
-#: Resolved once. Sanitizing on render as well as on write is deliberate —
-#: DB content could in theory be tampered with through another path.
-_sanitize = import_string(conf.SANITIZER)
-
-
 def _render_body(doc):
-    return mark_safe(_sanitize(doc.body_html))
+    """Sanitize on render as well as on write — DB content could in theory be
+    tampered with through another path.
+
+    Resolved per call, not memoised at import: a setting read once at import
+    time freezes whatever was configured then and breaks override_settings.
+    """
+    return mark_safe(import_string(conf.SANITIZER)(doc.body_html))
 
 
 def document(request, slug):
@@ -23,7 +24,8 @@ def document(request, slug):
     if slug not in DocType.values:
         raise Http404("Unknown legal document")
 
-    doc, is_fallback = LegalDocument.resolve(slug, get_language())
+    user = request.user if request.user.is_authenticated else None
+    doc, is_fallback = LegalDocument.resolve(slug, get_language(), user=user)
     if doc is None:
         raise Http404("This document has not been published yet")
 
@@ -82,9 +84,11 @@ def _accept_context(request, pending, error=False):
     language = get_language()
     documents = []
     for doc_type in pending:
-        doc, _fallback = LegalDocument.resolve(doc_type, language)
+        doc, _fallback = LegalDocument.resolve(doc_type, language, user=request.user)
         if doc is not None:
-            documents.append(doc)
+            # Body rendered inline so the text is genuinely presented, not just
+            # linked — a link nobody clicks is weak evidence of informed consent.
+            documents.append({"doc": doc, "body": _render_body(doc)})
 
     # Validate on the way IN as well, so a hostile URL never reaches the
     # hidden input in the first place. Belt and braces with the POST check.
@@ -96,3 +100,45 @@ def _accept_context(request, pending, error=False):
         "next": "" if checked == "/" else checked,
         "error": error,
     }
+
+
+@login_required
+def my_consents(request):
+    """What this user has accepted, and when. Linked from a profile page."""
+    accepted = {
+        (a.doc_type, a.version): a
+        for a in Acceptance.objects.filter(user=request.user)
+    }
+    required = LegalDocument.acceptance_required(request.user)
+    language = get_language()
+
+    rows = []
+    seen = set()
+    for doc_type, version in required.items():
+        doc, _fb = LegalDocument.resolve(doc_type, language, user=request.user)
+        seen.add((doc_type, version))
+        rows.append({
+            "doc_type": doc_type,
+            "title": doc.title if doc else doc_type,
+            "version": version,
+            "acceptance": accepted.get((doc_type, version)),
+        })
+
+    # Documents accepted in the past that are no longer required — the proof
+    # still belongs to the user and must remain visible.
+    for (doc_type, version), acc in sorted(accepted.items()):
+        if (doc_type, version) in seen:
+            continue
+        doc, _fb = LegalDocument.resolve(doc_type, language, user=request.user)
+        rows.append({
+            "doc_type": doc_type,
+            "title": doc.title if doc else doc_type,
+            "version": version,
+            "acceptance": acc,
+            "superseded": True,
+        })
+
+    return render(request, "consent_trail/my_consents.html", {
+        "base_template": conf.BASE_TEMPLATE,
+        "rows": rows,
+    })

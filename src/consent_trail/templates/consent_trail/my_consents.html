@@ -1,0 +1,55 @@
+{% extends base_template %}
+{% load i18n %}
+
+{% block title %}{% trans "My consents" %}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+
+      <h1 class="h4 mb-1">{% trans "My consents" %}</h1>
+      <p class="text-secondary small mb-4">
+        {% blocktrans %}The documents you accepted, and when.{% endblocktrans %}
+      </p>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>{% trans "Document" %}</th>
+              <th>{% trans "Version" %}</th>
+              <th>{% trans "Accepted on" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr{% if row.superseded %} class="text-secondary"{% endif %}>
+                <td>
+                  <a href="{% url 'consent_trail:document' row.doc_type %}">{{ row.title }}</a>
+                  {% if row.superseded %}
+                    <span class="badge text-bg-light">{% trans "superseded" %}</span>
+                  {% endif %}
+                </td>
+                <td>{{ row.version }}</td>
+                <td>
+                  {% if row.acceptance %}
+                    <time datetime="{{ row.acceptance.accepted_at|date:'c' }}">
+                      {{ row.acceptance.accepted_at|date:"d/m/Y H:i" }}
+                    </time>
+                  {% else %}
+                    <span class="badge text-bg-warning">{% trans "not accepted yet" %}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-secondary">{% trans "Nothing to show yet." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

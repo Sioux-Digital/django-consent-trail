@@ -302,3 +302,100 @@ class OpenRedirectTests(TestCase):
     def test_hostile_next_never_reaches_the_hidden_input(self):
         resp = self.client.get("/consent/accept/?next=https://evil.example/login")
         self.assertNotContains(resp, "evil.example")
+
+
+def exploding_resolver(user):
+    raise RuntimeError("boom")
+
+
+def resolver_org_a(user):
+    """Test resolver: everyone called *_a belongs to org A."""
+    return {"org:A"} if user.username.endswith("_a") else {"org:B"}
+
+
+@override_settings(CONSENT_TRAIL_AUDIENCE_RESOLVER="tests.test_consent_trail.resolver_org_a")
+class AudienceTests(TestCase):
+    """Targeting a subset of users without the package knowing what an org is."""
+
+    def setUp(self):
+        cache.clear()
+        self.alice = User.objects.create_user("alice_a", password="x")
+        self.bob = User.objects.create_user("bob_b", password="x")
+
+    def test_untargeted_document_applies_to_everyone(self):
+        make_doc(doc_type="cgu", version=1)
+        self.assertEqual(Acceptance.pending_for(self.alice), {"cgu": 1})
+        self.assertEqual(Acceptance.pending_for(self.bob), {"cgu": 1})
+
+    def test_targeted_document_only_applies_to_its_audience(self):
+        make_doc(doc_type="cgv", version=1, audience="org:A")
+        self.assertEqual(Acceptance.pending_for(self.alice), {"cgv": 1})
+        self.assertEqual(Acceptance.pending_for(self.bob), {})
+
+    def test_publishing_for_one_org_does_not_unpublish_another(self):
+        a = make_doc(doc_type="cgu", version=1, audience="org:A")
+        b = make_doc(doc_type="cgu", version=1, audience="org:B")
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertTrue(a.is_current)
+        self.assertTrue(b.is_current, "org B's version must survive org A's publication")
+
+    def test_a_broken_resolver_never_locks_users_out(self):
+        make_doc(doc_type="cgu", version=1, audience="org:A")
+        with override_settings(
+            CONSENT_TRAIL_AUDIENCE_RESOLVER="tests.test_consent_trail.exploding_resolver"
+        ):
+            self.assertEqual(
+                Acceptance.pending_for(self.alice), {},
+                "a resolver raising must degrade to 'no tags', never trap the user",
+            )
+
+
+class MyConsentsViewTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user("bob", password="pw")
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.user)
+
+    def test_requires_login(self):
+        self.client.logout()
+        self.assertEqual(self.client.get("/consent/my-consents/").status_code, 302)
+
+    def test_shows_not_accepted_yet(self):
+        resp = self.client.get("/consent/my-consents/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "not accepted yet")
+
+    def test_shows_the_acceptance_timestamp(self):
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get("/consent/my-consents/")
+        self.assertNotContains(resp, "not accepted yet")
+        self.assertContains(resp, "datetime=")
+
+    def test_superseded_acceptances_stay_visible(self):
+        """The proof belongs to the user even once the version moved on."""
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2)
+        resp = self.client.get("/consent/my-consents/")
+        self.assertContains(resp, "superseded")
+
+
+class PendingAdminViewTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.su = User.objects.create_superuser("root", "root@example.com", "pw")
+        self.bob = User.objects.create_user("bob", password="x")
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.su)
+
+    def test_lists_users_who_have_not_accepted(self):
+        resp = self.client.get("/admin/consent_trail/acceptance/pending/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "bob")
+
+    def test_user_disappears_once_they_accept(self):
+        Acceptance.record(self.bob, "cgu", 1)
+        resp = self.client.get("/admin/consent_trail/acceptance/pending/")
+        self.assertNotContains(resp, ">bob<")
