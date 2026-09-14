@@ -75,6 +75,7 @@ Every one is optional.
 | `CONSENT_TRAIL_EXEMPT_PREFIXES` | `("/legal/", "/accounts/", ...)` | Paths the middleware must not intercept. |
 | `CONSENT_TRAIL_SANITIZER` | `"consent_trail.sanitizer.clean_html"` | Dotted path to `f(str) -> str`. |
 | `CONSENT_TRAIL_ADMIN_EDITOR_CSS` / `_JS` | `()` | Static paths for a rich-text editor in the admin. Empty = plain textarea. |
+| `CONSENT_TRAIL_AUDIENCE_RESOLVER` | `"consent_trail.audience.everyone"` | `f(user) -> set[str]`. See *Targeting a subset of users*. |
 
 ### About the IP header
 
@@ -179,7 +180,7 @@ stops a browser.
 ## Data model
 
 ```
-LegalDocument   doc_type, language, version, title, body_html,
+LegalDocument   doc_type, language, version, audience, title, body_html,
                 is_current, published_at,
                 requires_acceptance, requires_reacceptance
 
@@ -192,6 +193,9 @@ Accepting version 3 satisfies both.
 
 Policy fields belong to the *version*, not the translation — saving one
 language row propagates them to its siblings so they cannot drift apart.
+
+Uniqueness is `(doc_type, language, version, audience)`, so two organisations
+can hold their own current version of the same document independently.
 
 ## Security
 
