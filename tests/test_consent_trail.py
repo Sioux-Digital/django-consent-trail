@@ -4,6 +4,7 @@ Run with:  python tests/manage.py test tests
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase, override_settings
 
@@ -399,3 +400,30 @@ class PendingAdminViewTests(TestCase):
         Acceptance.record(self.bob, "cgu", 1)
         resp = self.client.get("/admin/consent_trail/acceptance/pending/")
         self.assertNotContains(resp, ">bob<")
+
+
+class TemplateTagTests(TestCase):
+    """A footer must not link documents that do not exist yet."""
+
+    def setUp(self):
+        cache.clear()
+
+    def _render(self):
+        from django.template import Context, Template
+        from django.test import RequestFactory
+
+        t = Template("{% load consent_trail %}{% legal_documents as docs %}"
+                     "{% for slug, title in docs %}{{ slug }},{% endfor %}")
+        req = RequestFactory().get("/")
+        req.user = AnonymousUser()
+        return t.render(Context({"request": req}))
+
+    def test_lists_only_published_documents(self):
+        make_doc(doc_type="cgu", language="fr")
+        out = self._render()
+        self.assertIn("cgu", out)
+        self.assertNotIn("cgv", out)
+        self.assertNotIn("privacy", out)
+
+    def test_empty_when_nothing_published(self):
+        self.assertEqual(self._render(), "")
