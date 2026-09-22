@@ -84,11 +84,17 @@ def _accept_context(request, pending, error=False):
     language = get_language()
     documents = []
     for doc_type in pending:
-        doc, _fallback = LegalDocument.resolve(doc_type, language, user=request.user)
+        doc, is_fallback = LegalDocument.resolve(doc_type, language, user=request.user)
         if doc is not None:
             # Body rendered inline so the text is genuinely presented, not just
             # linked — a link nobody clicks is weak evidence of informed consent.
-            documents.append({"doc": doc, "body": _render_body(doc)})
+            # `is_fallback` travels with it: the screen that records consent is
+            # exactly where "this is not the text that binds you" has to appear.
+            documents.append({
+                "doc": doc,
+                "body": _render_body(doc),
+                "is_fallback": is_fallback,
+            })
 
     # Validate on the way IN as well, so a hostile URL never reaches the
     # hidden input in the first place. Belt and braces with the POST check.
@@ -97,6 +103,7 @@ def _accept_context(request, pending, error=False):
     return {
         "base_template": conf.BASE_TEMPLATE,
         "documents": documents,
+        "fallback_language": conf.FALLBACK_LANGUAGE,
         "next": "" if checked == "/" else checked,
         "error": error,
     }

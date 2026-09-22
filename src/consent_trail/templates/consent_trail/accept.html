@@ -36,6 +36,9 @@
                Reaching the bottom is what enables the checkbox below. #}
             <div class="card-body ct-scroll" data-ct-scroll
                  style="max-height:320px; overflow-y:auto;">
+              {# Outside the scroll pane would be nicer visually, but consent is
+                 the point: the caveat has to sit with the text it qualifies. #}
+              {% include "consent_trail/_language_notice.html" with doc=item.doc is_fallback=item.is_fallback %}
               <div class="ct-body">{{ item.body }}</div>
             </div>
           </div>

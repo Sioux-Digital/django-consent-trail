@@ -229,6 +229,23 @@ class DocumentViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "authoritative")
 
+    def test_translation_says_it_is_not_the_binding_text(self):
+        """Publishing a translation removes the fallback notice — something has
+        to take its place, or the translated terms read as binding."""
+        make_doc(doc_type="cgu", language="fr")
+        make_doc(doc_type="cgu", language="en")
+        with self.settings(LANGUAGE_CODE="en"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "information only")
+        self.assertNotContains(resp, "not available in your language")
+
+    def test_the_fallback_language_carries_no_notice(self):
+        make_doc(doc_type="cgu", language="fr")
+        with self.settings(LANGUAGE_CODE="fr"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertNotContains(resp, "information only")
+        self.assertNotContains(resp, "not available in your language")
+
     def test_body_is_sanitized_on_render(self):
         """Even if a row were tampered with directly in the DB."""
         doc = make_doc(doc_type="cgu", language="fr")
@@ -255,6 +272,13 @@ class AcceptViewTests(TestCase):
         resp = self.client.post("/consent/accept/", {})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Acceptance.objects.count(), 0)
+
+    def test_the_consent_screen_carries_the_language_notice(self):
+        """The page that records consent is where the caveat matters most."""
+        self.client.force_login(self.user)
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/accept/")
+        self.assertContains(resp, "authoritative")
 
     def test_ticking_records_the_proof_and_redirects(self):
         self.client.force_login(self.user)

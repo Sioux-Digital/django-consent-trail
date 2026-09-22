@@ -14,11 +14,7 @@
         {% if doc.published_at %}— {% trans "in force since" %} {{ doc.published_at|date:"d/m/Y" }}{% endif %}
       </p>
 
-      {% if is_fallback %}
-        <div class="alert alert-info" role="alert">
-          {% blocktrans %}This document is not available in your language. Only the French version is authoritative.{% endblocktrans %}
-        </div>
-      {% endif %}
+      {% include "consent_trail/_language_notice.html" %}
 
       <article class="ct-body">{{ body }}</article>
 
