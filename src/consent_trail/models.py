@@ -159,6 +159,17 @@ class LegalDocument(models.Model):
         if doc is not None:
             return doc, False
 
+        # Django hands back whatever it was given, region included: "en-us",
+        # "pt-br", "zh-hans". Documents are filed by base language. Without this
+        # retry, a site whose LANGUAGE_CODE carries a region never matches its
+        # own documents and every page quietly serves the fallback instead —
+        # which reads as working, in the wrong language.
+        base = (language or "").split("-")[0]
+        if base and base != language:
+            doc = pick(base)
+            if doc is not None:
+                return doc, False
+
         fallback = pick(conf.FALLBACK_LANGUAGE)
         return fallback, fallback is not None
 

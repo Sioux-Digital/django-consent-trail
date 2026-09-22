@@ -40,6 +40,13 @@ class ResolveTests(TestCase):
         self.assertEqual(doc.language, "fr")
         self.assertTrue(is_fallback)
 
+    def test_a_regional_code_matches_its_base_language(self):
+        """LANGUAGE_CODE is often "en-us"; documents are filed under "en"."""
+        make_doc(doc_type="cgu", language="en")
+        doc, is_fallback = LegalDocument.resolve("cgu", "en-us")
+        self.assertEqual(doc.language, "en")
+        self.assertFalse(is_fallback)
+
     def test_returns_none_when_nothing_published(self):
         doc, is_fallback = LegalDocument.resolve("cgv", "fr")
         self.assertIsNone(doc)
