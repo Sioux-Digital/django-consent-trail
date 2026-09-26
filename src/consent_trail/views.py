@@ -30,6 +30,16 @@ def document(request, slug):
     if doc is None:
         raise Http404("This document has not been published yet")
 
+    # Someone reading their own terms wants to know when they agreed to them —
+    # and the version they agreed to, which is not always the one on screen.
+    acceptance = None
+    if user is not None:
+        acceptance = (
+            Acceptance.objects.filter(user=user, doc_type=slug)
+            .order_by("-accepted_at")
+            .first()
+        )
+
     return render(
         request,
         "consent_trail/document.html",
@@ -39,6 +49,7 @@ def document(request, slug):
             "body": _render_body(doc),
             "is_fallback": is_fallback,
             "fallback_language": conf.FALLBACK_LANGUAGE,
+            "acceptance": acceptance,
         },
     )
 

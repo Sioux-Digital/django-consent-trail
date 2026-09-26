@@ -22,7 +22,17 @@
 
                 <div class="d-flex justify-content-between align-items-center gap-3">
                   <div class="me-auto">
-                    <div class="fw-semibold">{{ row.doc.title }}</div>
+                    {% comment %}
+                      The title is a link on EVERY row, signed ones included: once
+                      a document is signed its "Go to sign" button disappears, and
+                      without this there is no way left to reopen the text you
+                      just agreed to.
+                    {% endcomment %}
+                    <a href="{% url 'consent_trail:document' row.doc_type %}"
+                       target="_blank" rel="noopener"
+                       class="fw-semibold text-decoration-none">
+                      {{ row.doc.title }}
+                    </a>
                     <div class="text-secondary small">
                       {% trans "Version" %} {{ row.version }}
                       {% if row.is_fallback %}

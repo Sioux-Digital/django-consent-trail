@@ -14,6 +14,22 @@
           {% trans "Version" %} {{ doc.version }}
           {% if doc.published_at %}— {% trans "in force since" %} {{ doc.published_at|date:"d/m/Y" }}{% endif %}
         </p>
+
+        {% if acceptance %}
+          {% comment %}
+            A plain check character rather than an icon font: this app must render
+            in a host project that may not ship Bootstrap Icons.
+          {% endcomment %}
+          <p class="small mb-0 mt-1 ct-signed">
+            ✓
+            {% blocktrans with when=acceptance.accepted_at|date:"d/m/Y" at=acceptance.accepted_at|date:"H:i" %}You accepted this document on {{ when }} at {{ at }}{% endblocktrans %}
+            {% if acceptance.version != doc.version %}
+              <span class="ct-signed-stale">
+                — {% blocktrans with signed=acceptance.version %}you signed version {{ signed }}{% endblocktrans %}
+              </span>
+            {% endif %}
+          </p>
+        {% endif %}
       </div>
 
       {% comment %}
@@ -39,6 +55,10 @@
   /* Wide enough not to waste the window, capped so lines stay readable:
      legal prose set across 2500px is unreadable, not generous. */
   .ct-doc { max-width: 1100px; }
+  /* Distinct from the grey version line right above it: this one is about the
+     reader, not about the document. */
+  .ct-signed { color: #198754; font-weight: 600; }
+  .ct-signed-stale { color: #997404; font-weight: 400; }
   .ct-body { font-size: 1.05rem; line-height: 1.75; }
   .ct-body h2 { font-size: 1.3rem; margin-top: 2rem; }
   .ct-body h3 { font-size: 1.1rem; margin-top: 1.5rem; }

@@ -336,6 +336,37 @@ class DocumentViewTests(TestCase):
         resp = self.client.get("/consent/cgu/")
         self.assertNotContains(resp, "<script")
 
+    def test_a_reader_sees_when_they_accepted(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        user = User.objects.create_user("bob", password="pw")
+        Acceptance.record(user, "cgu", 1)
+        self.client.force_login(user)
+        resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "You accepted this document on")
+
+    def test_anonymous_sees_no_acceptance_line(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        resp = self.client.get("/consent/cgu/")
+        self.assertNotContains(resp, "You accepted this document on")
+
+    def test_a_reader_who_never_accepted_sees_no_line(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        self.client.force_login(User.objects.create_user("bob", password="pw"))
+        resp = self.client.get("/consent/cgu/")
+        self.assertNotContains(resp, "You accepted this document on")
+
+    def test_signing_an_older_version_is_said_so(self):
+        """Otherwise the page reads as "you agreed to this text", which is false
+        when the text on screen is a version they never saw."""
+        make_doc(doc_type="cgu", language="fr", version=1)
+        user = User.objects.create_user("bob", password="pw")
+        Acceptance.record(user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", language="fr", version=2)
+        self.client.force_login(user)
+        resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "you signed version 1")
+
 
 class AcceptViewTests(TestCase):
     def setUp(self):
@@ -421,6 +452,17 @@ class AcceptViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'href="/dashboard/"')
         self.assertNotContains(resp, "still needs your signature")
+
+    def test_every_title_links_to_its_document_even_once_signed(self):
+        """Once signed, the "Go to sign" button is gone. Without a linked title
+        there is no way left to reopen the text you just agreed to."""
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgu"})
+        resp = self.client.get("/consent/accept/?signed=1")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/consent/cgu/"')
+        self.assertContains(resp, 'target="_blank"')
+        self.assertNotContains(resp, "Go to sign")   # nothing left to sign
 
     def test_nothing_to_sign_and_no_signature_just_made_leaves_the_screen(self):
         """Otherwise the URL is a dead end for anyone who lands on it."""
