@@ -1,7 +1,8 @@
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import redirect, render
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.utils.module_loading import import_string
 from django.utils.safestring import mark_safe
 from django.utils.translation import get_language
@@ -61,51 +62,91 @@ def safe_next(request, raw):
 
 @login_required
 def accept(request):
-    """Re-acceptance screen: shown when a document changed substantively."""
+    """Signature screen: one row per document, signed one at a time.
+
+    Deliberately NOT one global checkbox over every document inlined on the page.
+    Each document is opened on its own page and signed on its own POST, so the
+    ``Acceptance`` rows carry genuinely different timestamps — "I accepted the
+    privacy policy at 16:04 and the terms of sale at 16:07" is a far better
+    record than three rows stamped the same second by one click.
+
+    Trade-off accepted: the binding text is now behind a link the user must open
+    rather than scrolled inline. Weaker presentation evidence, much clearer
+    per-document consent. Chosen by the product owner.
+    """
     pending = Acceptance.pending_for(request.user)
-    if not pending:
-        return redirect("/")
 
     if request.method == "POST":
-        if not request.POST.get("accept"):
-            return render(
-                request,
-                "consent_trail/accept.html",
-                _accept_context(request, pending, error=True),
-            )
-        for doc_type, version in pending.items():
-            Acceptance.record(request.user, doc_type, version, request=request)
-        return redirect(safe_next(request, request.POST.get("next")))
+        doc_type = request.POST.get("doc_type")
+        if doc_type not in pending:
+            # Already signed in another tab, or a forged/stale field. Re-render
+            # rather than error: the state below is the truth.
+            return redirect(_self_url(request, request.POST.get("next"), signed=True))
+        Acceptance.record(request.user, doc_type, pending[doc_type], request=request)
+        return redirect(_self_url(request, request.POST.get("next"), signed=True))
+
+    # Nothing to sign and no signature just made → this page has no purpose.
+    # `signed` keeps the confirmation step visible after the last signature
+    # instead of bouncing the user off mid-flow.
+    if not pending and not request.GET.get("signed"):
+        return redirect(safe_next(request, request.GET.get("next")))
 
     return render(request, "consent_trail/accept.html", _accept_context(request, pending))
 
 
-def _accept_context(request, pending, error=False):
-    language = get_language()
-    documents = []
-    for doc_type in pending:
-        doc, is_fallback = LegalDocument.resolve(doc_type, language, user=request.user)
-        if doc is not None:
-            # Body rendered inline so the text is genuinely presented, not just
-            # linked — a link nobody clicks is weak evidence of informed consent.
-            # `is_fallback` travels with it: the screen that records consent is
-            # exactly where "this is not the text that binds you" has to appear.
-            documents.append({
-                "doc": doc,
-                "body": _render_body(doc),
-                "is_fallback": is_fallback,
-            })
+def _self_url(request, raw_next, signed=False):
+    """This view's URL, preserving a validated ``next``."""
+    params = {}
+    checked = safe_next(request, raw_next)
+    if checked != "/":
+        params["next"] = checked
+    if signed:
+        params["signed"] = "1"
+    url = reverse("consent_trail:accept")
+    return f"{url}?{urlencode(params)}" if params else url
 
-    # Validate on the way IN as well, so a hostile URL never reaches the
-    # hidden input in the first place. Belt and braces with the POST check.
+
+def _accept_context(request, pending):
+    """Rows for every document requiring consent, pending or already signed.
+
+    Showing the already-signed ones costs no extra state and reads better than a
+    list that silently shrinks: the user sees their whole standing agreement,
+    with the one line that needs action standing out.
+    """
+    language = get_language()
+    required = LegalDocument.acceptance_required(request.user)
+
+    signed_rows = {}
+    for acceptance in Acceptance.objects.filter(
+        user=request.user, doc_type__in=required
+    ).order_by("accepted_at"):
+        signed_rows[acceptance.doc_type] = acceptance  # keep the latest
+
+    rows = []
+    for doc_type, version in sorted(required.items()):
+        doc, is_fallback = LegalDocument.resolve(doc_type, language, user=request.user)
+        if doc is None:
+            continue
+        rows.append({
+            "doc": doc,
+            "doc_type": doc_type,
+            "version": version,
+            "is_fallback": is_fallback,
+            "pending": doc_type in pending,
+            "acceptance": signed_rows.get(doc_type),
+        })
+
+    # Validate on the way IN as well, so a hostile URL never reaches the hidden
+    # input in the first place. Belt and braces with the POST check.
     raw_next = request.POST.get("next") if request.method == "POST" else request.GET.get("next")
     checked = safe_next(request, raw_next)
     return {
         "base_template": conf.BASE_TEMPLATE,
-        "documents": documents,
+        "rows": rows,
+        "pending_count": len(pending),
         "fallback_language": conf.FALLBACK_LANGUAGE,
         "next": "" if checked == "/" else checked,
-        "error": error,
+        "continue_url": checked,
     }
 
 

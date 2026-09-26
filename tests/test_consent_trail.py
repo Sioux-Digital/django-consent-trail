@@ -347,33 +347,97 @@ class AcceptViewTests(TestCase):
         resp = self.client.get("/consent/accept/")
         self.assertEqual(resp.status_code, 302)
 
-    def test_submitting_without_ticking_is_refused_server_side(self):
+    def test_posting_no_document_records_nothing(self):
         """The HTML `required` attribute only stops a browser."""
         self.client.force_login(self.user)
         resp = self.client.post("/consent/accept/", {})
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
         self.assertEqual(Acceptance.objects.count(), 0)
 
-    def test_the_consent_screen_carries_the_language_notice(self):
-        """The page that records consent is where the caveat matters most."""
+    def test_posting_a_document_that_is_not_pending_records_nothing(self):
+        """A forged or stale doc_type must not create a phantom acceptance."""
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgv"})
+        self.assertEqual(Acceptance.objects.count(), 0)
+
+    def test_the_consent_screen_flags_a_language_fallback(self):
+        """Compact wording now, because the full notice lives on the document
+        page the user is required to open. Previously this screen inlined the
+        shared _language_notice.html; the caveat still travels with the binding
+        text, it is simply no longer duplicated in a one-line list."""
         self.client.force_login(self.user)
         with self.settings(LANGUAGE_CODE="ja"):
             resp = self.client.get("/consent/accept/")
-        self.assertContains(resp, "authoritative")
+        self.assertContains(resp, "only the French version is binding")
 
-    def test_ticking_records_the_proof_and_redirects(self):
+    def test_signing_records_the_proof_and_returns_to_the_screen(self):
+        """It no longer jumps straight to `next`: the user confirms with
+        Continue, so signing several documents does not bounce them off after
+        the first one."""
         self.client.force_login(self.user)
-        resp = self.client.post("/consent/accept/", {"accept": "1", "next": "/dashboard/"})
+        resp = self.client.post(
+            "/consent/accept/", {"doc_type": "cgu", "next": "/dashboard/"}
+        )
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, "/dashboard/")
+        self.assertIn("/consent/accept/", resp.url)
+        self.assertIn("next=%2Fdashboard%2F", resp.url)
         proof = Acceptance.objects.get(user=self.user, doc_type="cgu")
         self.assertEqual(proof.version, 1)
         self.assertIsNotNone(proof.accepted_at)
 
+    def test_each_post_signs_one_document_only(self):
+        """Why the timestamps end up genuinely different: one POST, one row.
+
+        A single form over every document stamped them all the same second,
+        which is a much weaker record than "privacy at 16:04, terms at 16:07".
+        """
+        make_doc(doc_type="cgv", version=1)
+        cache.clear()
+        self.client.force_login(self.user)
+
+        self.client.post("/consent/accept/", {"doc_type": "cgu"})
+        self.assertEqual(
+            sorted(Acceptance.objects.values_list("doc_type", flat=True)), ["cgu"]
+        )
+        self.assertEqual(Acceptance.pending_for(self.user), {"cgv": 1})
+
+        self.client.post("/consent/accept/", {"doc_type": "cgv"})
+        self.assertEqual(
+            sorted(Acceptance.objects.values_list("doc_type", flat=True)),
+            ["cgu", "cgv"],
+        )
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_continue_is_inert_while_something_is_pending(self):
+        self.client.force_login(self.user)
+        resp = self.client.get("/consent/accept/")
+        self.assertContains(resp, "disabled")
+        self.assertContains(resp, "still needs your signature")
+
+    def test_continue_becomes_a_link_once_everything_is_signed(self):
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgu", "next": "/dashboard/"})
+        resp = self.client.get("/consent/accept/?next=/dashboard/&signed=1")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/dashboard/"')
+        self.assertNotContains(resp, "still needs your signature")
+
+    def test_nothing_to_sign_and_no_signature_just_made_leaves_the_screen(self):
+        """Otherwise the URL is a dead end for anyone who lands on it."""
+        self.client.force_login(self.user)
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get("/consent/accept/?next=/inventory/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, "/inventory/")
+
 
 class OpenRedirectTests(TestCase):
     """The acceptance screen is seen by every user after a terms update, so an
-    unvalidated `next` is a first-rate phishing vector."""
+    unvalidated `next` is a first-rate phishing vector.
+
+    The POST now returns to this screen rather than following `next`, so the
+    hostile value has three places to leak from: the round-trip URL, the hidden
+    input, and the Continue link. All three are checked."""
 
     def setUp(self):
         cache.clear()
@@ -381,33 +445,92 @@ class OpenRedirectTests(TestCase):
         make_doc(doc_type="cgu", version=1)
         self.client.force_login(self.user)
 
-    def test_absolute_external_url_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "https://evil.example/login"}
+    def _sign(self, next_value):
+        return self.client.post(
+            "/consent/accept/", {"doc_type": "cgu", "next": next_value}
         )
-        self.assertEqual(resp.url, "/")
 
-    def test_protocol_relative_url_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "//evil.example/login"}
-        )
-        self.assertEqual(resp.url, "/")
+    def test_absolute_external_url_is_dropped_from_the_round_trip(self):
+        resp = self._sign("https://evil.example/login")
+        self.assertNotIn("evil.example", resp.url)
 
-    def test_javascript_scheme_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "javascript:alert(1)"}
-        )
-        self.assertEqual(resp.url, "/")
+    def test_protocol_relative_url_is_dropped(self):
+        resp = self._sign("//evil.example/login")
+        self.assertNotIn("evil.example", resp.url)
+
+    def test_javascript_scheme_is_dropped(self):
+        resp = self._sign("javascript:alert(1)")
+        self.assertNotIn("javascript", resp.url)
 
     def test_internal_path_is_kept(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "/inventory/"}
-        )
-        self.assertEqual(resp.url, "/inventory/")
+        resp = self._sign("/inventory/")
+        self.assertIn("next=%2Finventory%2F", resp.url)
 
     def test_hostile_next_never_reaches_the_hidden_input(self):
         resp = self.client.get("/consent/accept/?next=https://evil.example/login")
         self.assertNotContains(resp, "evil.example")
+
+    def test_hostile_next_never_becomes_the_continue_link(self):
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get(
+            "/consent/accept/?signed=1&next=https://evil.example/login"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "evil.example")
+
+    def test_the_leave_redirect_also_validates_next(self):
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get("/consent/accept/?next=https://evil.example/login")
+        self.assertEqual(resp.url, "/")
+
+
+class RenderedCommentTests(TestCase):
+    """No template comment may reach the browser.
+
+    Django's short comment form spans ONE line only; written across several it is
+    emitted verbatim. That shipped three times — on the signup page, on the
+    layout bridge, and on the public legal documents, where visitors read
+    paragraphs of developer prose in the middle of the terms. Structural checks
+    all passed, because none of them looked at what the page actually says.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user("bob", password="pw")
+
+    def assertNoTemplateComment(self, resp, where):
+        body = resp.content.decode("utf-8", "replace")
+        for marker in ("{#", "#}", "{% comment", "endcomment %}"):
+            self.assertNotIn(
+                marker, body,
+                f"{where}: {marker!r} reached the browser — a multi-line "
+                f"short comment is rendered as text, use {{% comment %}}",
+            )
+
+    def test_document_page_is_clean(self):
+        make_doc(doc_type="cgu", language="fr")
+        self.assertNoTemplateComment(self.client.get("/consent/cgu/"), "/consent/cgu/")
+
+    def test_document_page_is_clean_on_a_language_fallback(self):
+        """_language_notice.html is where the worst offender lived."""
+        make_doc(doc_type="cgu", language="fr")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertNoTemplateComment(resp, "/consent/cgu/ (fallback)")
+
+    def test_acceptance_screen_is_clean(self):
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.user)
+        self.assertNoTemplateComment(
+            self.client.get("/consent/accept/"), "/consent/accept/"
+        )
+
+    def test_my_consents_is_clean(self):
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.user)
+        self.assertNoTemplateComment(
+            self.client.get("/consent/my-consents/"), "/consent/my-consents/"
+        )
 
 
 def exploding_resolver(user):
