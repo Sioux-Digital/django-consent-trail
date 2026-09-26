@@ -98,12 +98,86 @@ class AcceptanceTests(TestCase):
         Acceptance.record(self.user, "cgu", 1)
         self.assertEqual(Acceptance.pending_for(self.user), {})
 
-    def test_new_version_makes_it_pending_again(self):
+    def test_a_substantive_new_version_makes_it_pending_again(self):
         make_doc(doc_type="cgu", version=1)
         Acceptance.record(self.user, "cgu", 1)
         cache.clear()
-        make_doc(doc_type="cgu", version=2)
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
         self.assertEqual(Acceptance.pending_for(self.user), {"cgu": 2})
+
+    def test_a_typo_fix_does_not_block_anyone(self):
+        """The whole point of ``requires_reacceptance``.
+
+        Without this, correcting a comma in the CGU walls every user of the site
+        behind a consent screen. Previously asserted the opposite: a test named
+        ``test_new_version_makes_it_pending_again`` published v2 with the flag
+        left at its default and demanded re-acceptance, which is what let the
+        defect ship — the flag was declared, propagated, exposed in the admin,
+        and read by nothing.
+        """
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2)  # requires_reacceptance defaults False
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {},
+            "a non-substantive edit must not invalidate an existing consent",
+        )
+
+    def test_consent_stands_for_edits_published_after_a_substantive_one(self):
+        """v2 substantive, accepted; v3 and v4 are typo fixes → still compliant."""
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        Acceptance.record(self.user, "cgu", 2)
+        cache.clear()
+        make_doc(doc_type="cgu", version=3)
+        make_doc(doc_type="cgu", version=4)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_a_missed_substantive_version_still_blocks_after_later_edits(self):
+        """The trap: v2 was substantive and never accepted, v3 is a typo fix.
+
+        Looking only at the current version's flag would let the user through
+        having never consented to the substantive change.
+        """
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        cache.clear()
+        make_doc(doc_type="cgu", version=3)
+        cache.clear()
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {"cgu": 3},
+            "must still block, and on the CURRENT version — that is the text "
+            "they have to be shown",
+        )
+
+    def test_a_brand_new_user_must_accept_even_with_no_flagged_version(self):
+        make_doc(doc_type="cgu", version=1)
+        make_doc(doc_type="cgu", version=2)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {"cgu": 2})
+
+    def test_accepting_the_current_version_is_enough_when_it_is_flagged(self):
+        make_doc(doc_type="cgu", version=1, requires_reacceptance=True)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_publishing_invalidates_the_floor_cache(self):
+        """The floor is cached per doc_type; a stale floor silently unblocks."""
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        self.assertEqual(Acceptance.pending_for(self.user), {})  # primes the cache
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {"cgu": 2},
+            "save() must drop the floor cache, without an explicit cache.clear()",
+        )
 
     def test_acceptance_is_language_independent(self):
         """The design point behind building this instead of using a package.

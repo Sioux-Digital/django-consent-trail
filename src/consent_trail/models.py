@@ -34,6 +34,7 @@ class DocType(models.TextChoices):
 
 
 _PENDING_CACHE_KEY = "consent_trail.acceptance_required"
+_FLOOR_CACHE_KEY = "consent_trail.reacceptance_floors"
 
 
 class LegalDocument(models.Model):
@@ -130,9 +131,11 @@ class LegalDocument(models.Model):
             ).exclude(pk=self.pk).update(is_current=False)
 
         cache.delete(_PENDING_CACHE_KEY)
+        cache.delete(_FLOOR_CACHE_KEY)
 
     def delete(self, *args, **kwargs):
         cache.delete(_PENDING_CACHE_KEY)
+        cache.delete(_FLOOR_CACHE_KEY)
         return super().delete(*args, **kwargs)
 
     # ── Lookups ──────────────────────────────────────────────────────────
@@ -195,6 +198,39 @@ class LegalDocument(models.Model):
         return rows
 
     @classmethod
+    def _reacceptance_floors(cls):
+        """``{doc_type: oldest version that still counts as consent}``.
+
+        A user stays compliant as long as they accepted SOME version at or above
+        this floor. The floor is the newest version flagged
+        ``requires_reacceptance``: everything published after it was declared a
+        non-substantive edit, so an earlier acceptance still stands.
+
+        Without this, every new version blocked every user — which made
+        ``requires_reacceptance`` a decorative field and turned a typo fix into a
+        site-wide consent wall.
+
+        Doc types with no flagged version at all are simply absent, which reads
+        as floor 0 at the call site: any past acceptance is enough.
+
+        Collapsed per doc_type, ignoring ``audience`` — same simplification as
+        ``acceptance_required``, whose max() also flattens audiences. If audience
+        targeting ever drives real policy differences, both need the tag test.
+        """
+        cached = cache.get(_FLOOR_CACHE_KEY)
+        if cached is not None:
+            return cached
+
+        floors = dict(
+            cls.objects.filter(requires_acceptance=True, requires_reacceptance=True)
+            .values("doc_type")
+            .annotate(floor=models.Max("version"))
+            .values_list("doc_type", "floor")
+        )
+        cache.set(_FLOOR_CACHE_KEY, floors, conf.CACHE_SECONDS)
+        return floors
+
+    @classmethod
     def acceptance_required(cls, user=None):
         """``{doc_type: version}`` this user must have accepted.
 
@@ -253,17 +289,31 @@ class Acceptance(models.Model):
 
     @classmethod
     def pending_for(cls, user):
-        """Doc types this user still has to accept, as ``{doc_type: version}``."""
+        """Doc types this user still has to accept, as ``{doc_type: version}``.
+
+        Not "has the user accepted the newest version" — that would block
+        everyone on a typo fix. The question is whether a version the user never
+        accepted was declared *substantive*; see
+        ``LegalDocument._reacceptance_floors``.
+        """
         required = LegalDocument.acceptance_required(user)
         if not required:
             return {}
 
-        accepted = set(
-            cls.objects.filter(user=user, doc_type__in=required).values_list(
-                "doc_type", "version"
-            )
-        )
-        return {d: v for d, v in required.items() if (d, v) not in accepted}
+        best = {}
+        for doc_type, version in cls.objects.filter(
+            user=user, doc_type__in=required
+        ).values_list("doc_type", "version"):
+            best[doc_type] = max(version, best.get(doc_type, 0))
+
+        floors = LegalDocument._reacceptance_floors()
+        pending = {}
+        for doc_type, version in required.items():
+            accepted = best.get(doc_type, 0)
+            # 0 = never accepted anything for this document: always blocking.
+            if accepted == 0 or accepted < floors.get(doc_type, 0):
+                pending[doc_type] = version
+        return pending
 
     @classmethod
     def record(cls, user, doc_type, version, request=None):
