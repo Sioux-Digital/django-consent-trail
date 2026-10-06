@@ -8,7 +8,7 @@ project's test suite and any runtime reconfiguration.
 Usage stays ordinary::
 
     from . import conf
-    conf.FALLBACK_LANGUAGE
+    conf.AUTHORITATIVE_LANGUAGE
 """
 
 from django.conf import settings
@@ -20,9 +20,15 @@ DEFAULTS = {
     #: impossible to reuse.
     "BASE_TEMPLATE": "consent_trail/base.html",
 
-    #: Language served when the requested one has no published version.
-    #: The prevalence notice is shown whenever we fall back.
-    "FALLBACK_LANGUAGE": "fr",
+    #: The language whose text legally prevails — and therefore the one served
+    #: when the requested language has no published version. The prevalence
+    #: notice names this language to the reader, so setting it to "de" makes the
+    #: notice say German: never hardcode a language name in a legal notice.
+    #:
+    #: One setting for both meanings on purpose. They are the same language in
+    #: every real jurisdiction: you fall back to the authoritative text because
+    #: it is the one that binds. Split them only if a real case turns up.
+    "AUTHORITATIVE_LANGUAGE": "fr",
 
     #: Where to read the client IP for the acceptance proof.
     #: Behind a CDN or reverse proxy, REMOTE_ADDR is the proxy — every consent

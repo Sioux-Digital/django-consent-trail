@@ -5,10 +5,40 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.utils.module_loading import import_string
 from django.utils.safestring import mark_safe
-from django.utils.translation import get_language
+from django.utils.translation import get_language, get_language_info
 
 from . import conf
 from .models import DocType, Acceptance, LegalDocument
+
+
+def _language_display_name(code):
+    """Human name of a language code, written in the reader's own language.
+
+    ``name_translated`` rather than ``name_local``: a Japanese reader should be
+    told "フランス語版のみが…", not "françaisのみ…".
+
+    Django only knows the codes in its own table and raises ``KeyError`` on
+    anything else, including a perfectly legitimate private-use code. Degrade to
+    the raw code — a legal notice is the last place that may 500.
+    """
+    try:
+        return get_language_info(code)["name_translated"]
+    except KeyError:
+        return code
+
+
+def _language_context():
+    """Everything the prevalence notice needs to name the binding language.
+
+    Shared so the document page and the acceptance screen cannot drift: the
+    language a court is told prevails must be the same on both screens.
+    """
+    code = conf.AUTHORITATIVE_LANGUAGE
+    return {
+        "authoritative_language": code,
+        "authoritative_language_name": _language_display_name(code),
+    }
+
 
 def _render_body(doc):
     """Sanitize on render as well as on write — DB content could in theory be
@@ -48,8 +78,8 @@ def document(request, slug):
             "doc": doc,
             "body": _render_body(doc),
             "is_fallback": is_fallback,
-            "fallback_language": conf.FALLBACK_LANGUAGE,
             "acceptance": acceptance,
+            **_language_context(),
         },
     )
 
@@ -155,7 +185,7 @@ def _accept_context(request, pending):
         "base_template": conf.BASE_TEMPLATE,
         "rows": rows,
         "pending_count": len(pending),
-        "fallback_language": conf.FALLBACK_LANGUAGE,
+        **_language_context(),
         "next": "" if checked == "/" else checked,
         "continue_url": checked,
     }

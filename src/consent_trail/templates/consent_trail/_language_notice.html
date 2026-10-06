@@ -15,10 +15,10 @@
 {% endcomment %}
 {% if is_fallback %}
   <div class="alert alert-info" role="alert">
-    {% blocktrans %}This document is not available in your language. Only the French version is authoritative.{% endblocktrans %}
+    {% blocktrans with lang=authoritative_language_name %}This document is not available in your language. Only the {{ lang }} version is authoritative.{% endblocktrans %}
   </div>
-{% elif doc.language != fallback_language %}
+{% elif doc.language != authoritative_language %}
   <div class="alert alert-secondary" role="alert">
-    {% blocktrans %}This translation is provided for information only. Only the French version is legally binding.{% endblocktrans %}
+    {% blocktrans with lang=authoritative_language_name %}This translation is provided for information only. Only the {{ lang }} version is legally binding.{% endblocktrans %}
   </div>
 {% endif %}

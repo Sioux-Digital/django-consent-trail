@@ -145,7 +145,7 @@ class LegalDocument(models.Model):
         """Current document for ``language``, falling back when untranslated.
 
         Returns ``(document, is_fallback)``. ``is_fallback`` drives the
-        "only the French version is authoritative" notice.
+        "only the <authoritative language> version is authoritative" notice.
         """
         tags = audience_mod.tags_for(user) if user is not None else set()
 
@@ -173,7 +173,7 @@ class LegalDocument(models.Model):
             if doc is not None:
                 return doc, False
 
-        fallback = pick(conf.FALLBACK_LANGUAGE)
+        fallback = pick(conf.AUTHORITATIVE_LANGUAGE)
         return fallback, fallback is not None
 
     @classmethod
