@@ -304,8 +304,10 @@ class DocumentViewTests(TestCase):
         self.assertEqual(self.client.get("/consent/cgv/").status_code, 404)
 
     def test_fallback_shows_the_prevalence_notice(self):
+        # "en" rather than "ja": this test is about the notice appearing at all,
+        # so it reads the msgid instead of asserting on our own translation.
         make_doc(doc_type="cgu", language="fr")
-        with self.settings(LANGUAGE_CODE="ja"):
+        with self.settings(LANGUAGE_CODE="en"):
             resp = self.client.get("/consent/cgu/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "authoritative")
@@ -320,12 +322,40 @@ class DocumentViewTests(TestCase):
         self.assertContains(resp, "information only")
         self.assertNotContains(resp, "not available in your language")
 
-    def test_the_fallback_language_carries_no_notice(self):
+    def test_the_authoritative_language_carries_no_notice(self):
         make_doc(doc_type="cgu", language="fr")
         with self.settings(LANGUAGE_CODE="fr"):
             resp = self.client.get("/consent/cgu/")
         self.assertNotContains(resp, "information only")
         self.assertNotContains(resp, "not available in your language")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="de")
+    def test_the_notice_names_the_configured_language_not_french(self):
+        """A notice that hardcodes a language name lies as soon as someone
+        configures a different one — and it lies about which text binds them."""
+        make_doc(doc_type="cgu", language="de")
+        with self.settings(LANGUAGE_CODE="en"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "German")
+        self.assertNotContains(resp, "French")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="de")
+    def test_the_notice_names_the_language_in_the_readers_language(self):
+        """A Japanese reader is told "ドイツ語", not "Deutsch" and not "German":
+        the one sentence that says which text binds them must be readable."""
+        make_doc(doc_type="cgu", language="de")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "ドイツ語")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="qqq-private")
+    def test_a_language_code_django_does_not_know_degrades_to_the_code(self):
+        """get_language_info raises on unknown codes. A legal notice must not 500."""
+        make_doc(doc_type="cgu", language="qqq-private")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "qqq-private")
 
     def test_body_is_sanitized_on_render(self):
         """Even if a row were tampered with directly in the DB."""
@@ -399,7 +429,10 @@ class AcceptViewTests(TestCase):
         self.client.force_login(self.user)
         with self.settings(LANGUAGE_CODE="ja"):
             resp = self.client.get("/consent/accept/")
-        self.assertContains(resp, "only the French version is binding")
+        # The binding language is named from the setting, in the reader's own
+        # language — "フランス語" for a Japanese reader, not a hardcoded "French".
+        self.assertContains(resp, "フランス語")
+        self.assertContains(resp, "法的拘束力")
 
     def test_signing_records_the_proof_and_returns_to_the_screen(self):
         """It no longer jumps straight to `next`: the user confirms with
@@ -697,3 +730,42 @@ class TemplateTagTests(TestCase):
 
     def test_empty_when_nothing_published(self):
         self.assertEqual(self._render(), "")
+
+
+class ShippedCatalogueTests(TestCase):
+    """The package ships its own compiled catalogues in consent_trail/locale/.
+
+    These tests fail if the .mo files are missing, stale, or not picked up —
+    which is exactly what happens when someone edits a .po and forgets
+    `compilemessages`, or when a packaging change drops locale/ from the wheel.
+    A silently English consent screen is the failure mode they prevent.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def test_django_picks_up_the_packages_own_catalogue(self):
+        """No LOCALE_PATHS involved: Django merges an installed app's catalogue
+        on its own. This is what lets a host project configure nothing."""
+        from django.utils.translation import gettext, override
+        with override("fr"):
+            self.assertEqual(gettext("Signed"), "Signé")
+        with override("ja"):
+            self.assertEqual(gettext("Signed"), "署名済み")
+
+    def test_the_consent_screen_is_translated_end_to_end(self):
+        make_doc(doc_type="cgu", language="fr", requires_acceptance=True)
+        user = User.objects.create_user("bob", password="pw")
+        self.client.force_login(user)
+        with self.settings(LANGUAGE_CODE="fr"):
+            resp = self.client.get("/consent/accept/")
+        self.assertContains(resp, "Nos conditions ont changé")
+
+    def test_the_prevalence_notice_is_translated_with_its_placeholder_intact(self):
+        """A translation that drops %(lang)s renders a notice naming no language
+        at all — worse than English, because it still claims something binds."""
+        make_doc(doc_type="cgu", language="fr")
+        with self.settings(LANGUAGE_CODE="es"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "Solo la versión en")
+        self.assertContains(resp, "prevalece")

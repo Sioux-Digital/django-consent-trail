@@ -12,3 +12,7 @@ htmlcov/
 .pytest_cache/
 .tox/
 .DS_Store
+# A library pins nothing: resolution is the host project's business.
+uv.lock
+# NB: *.mo is deliberately NOT ignored — the compiled catalogues ship with the
+# package so an editable install needs no build step. See CLAUDE.md.
