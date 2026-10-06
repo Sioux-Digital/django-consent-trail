@@ -1,0 +1,59 @@
+name: release
+
+# Publishes to PyPI when a version tag is pushed.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Authentication is Trusted Publishing (OIDC): PyPI verifies that the request
+# comes from this repository and this workflow. There is no API token stored
+# anywhere, so there is none to leak, rotate, or forget.
+#
+# One-time setup on PyPI → Publishing → "Add a pending publisher":
+#   owner: Sioux-Digital   repo: django-consent-trail
+#   workflow: release.yml  environment: pypi
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install build twine
+
+      - run: python -m build
+
+      # Rejects a broken README before it is frozen on PyPI: a release cannot
+      # be re-uploaded under the same version number, ever.
+      - run: python -m twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Named environment so the pending publisher can be scoped to it, and so a
+    # manual approval can be required later without touching this file.
+    environment: pypi
+    permissions:
+      id-token: write  # required for OIDC; this is what replaces the API token
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

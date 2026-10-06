@@ -1,22 +1,24 @@
 {% load i18n %}
-{# What a translation is worth, legally.
+{% comment %}
+  What a translation is worth, legally.
 
-   Shared by the document page and the acceptance screen on purpose: the
-   wording someone consents to has to be the wording they can read back
-   afterwards. Two copies of this notice would eventually disagree, and the
-   one that matters is whichever a court reads second.
+  Shared by the document page and the acceptance screen on purpose: the wording
+  someone consents to has to be the wording they can read back afterwards. Two
+  copies of this notice would eventually disagree, and the one that matters is
+  whichever a court reads second.
 
-   Two distinct situations:
-   - is_fallback  — nothing published in this language, they are reading the
-     fallback one and may not speak it.
-   - a translation exists but is not the fallback language — they can read it,
-     it simply is not the text that binds them. #}
+  Two distinct situations:
+  - is_fallback — nothing published in this language, they are reading the
+    fallback one and may not speak it.
+  - a translation exists but is not the fallback language — they can read it, it
+    simply is not the text that binds them.
+{% endcomment %}
 {% if is_fallback %}
   <div class="alert alert-info" role="alert">
-    {% blocktrans %}This document is not available in your language. Only the French version is authoritative.{% endblocktrans %}
+    {% blocktrans with lang=authoritative_language_name %}This document is not available in your language. Only the {{ lang }} version is authoritative.{% endblocktrans %}
   </div>
-{% elif doc.language != fallback_language %}
+{% elif doc.language != authoritative_language %}
   <div class="alert alert-secondary" role="alert">
-    {% blocktrans %}This translation is provided for information only. Only the French version is legally binding.{% endblocktrans %}
+    {% blocktrans with lang=authoritative_language_name %}This translation is provided for information only. Only the {{ lang }} version is legally binding.{% endblocktrans %}
   </div>
 {% endif %}

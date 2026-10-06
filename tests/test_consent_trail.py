@@ -98,12 +98,86 @@ class AcceptanceTests(TestCase):
         Acceptance.record(self.user, "cgu", 1)
         self.assertEqual(Acceptance.pending_for(self.user), {})
 
-    def test_new_version_makes_it_pending_again(self):
+    def test_a_substantive_new_version_makes_it_pending_again(self):
         make_doc(doc_type="cgu", version=1)
         Acceptance.record(self.user, "cgu", 1)
         cache.clear()
-        make_doc(doc_type="cgu", version=2)
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
         self.assertEqual(Acceptance.pending_for(self.user), {"cgu": 2})
+
+    def test_a_typo_fix_does_not_block_anyone(self):
+        """The whole point of ``requires_reacceptance``.
+
+        Without this, correcting a comma in the CGU walls every user of the site
+        behind a consent screen. Previously asserted the opposite: a test named
+        ``test_new_version_makes_it_pending_again`` published v2 with the flag
+        left at its default and demanded re-acceptance, which is what let the
+        defect ship — the flag was declared, propagated, exposed in the admin,
+        and read by nothing.
+        """
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2)  # requires_reacceptance defaults False
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {},
+            "a non-substantive edit must not invalidate an existing consent",
+        )
+
+    def test_consent_stands_for_edits_published_after_a_substantive_one(self):
+        """v2 substantive, accepted; v3 and v4 are typo fixes → still compliant."""
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        Acceptance.record(self.user, "cgu", 2)
+        cache.clear()
+        make_doc(doc_type="cgu", version=3)
+        make_doc(doc_type="cgu", version=4)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_a_missed_substantive_version_still_blocks_after_later_edits(self):
+        """The trap: v2 was substantive and never accepted, v3 is a typo fix.
+
+        Looking only at the current version's flag would let the user through
+        having never consented to the substantive change.
+        """
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        cache.clear()
+        make_doc(doc_type="cgu", version=3)
+        cache.clear()
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {"cgu": 3},
+            "must still block, and on the CURRENT version — that is the text "
+            "they have to be shown",
+        )
+
+    def test_a_brand_new_user_must_accept_even_with_no_flagged_version(self):
+        make_doc(doc_type="cgu", version=1)
+        make_doc(doc_type="cgu", version=2)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {"cgu": 2})
+
+    def test_accepting_the_current_version_is_enough_when_it_is_flagged(self):
+        make_doc(doc_type="cgu", version=1, requires_reacceptance=True)
+        Acceptance.record(self.user, "cgu", 1)
+        cache.clear()
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_publishing_invalidates_the_floor_cache(self):
+        """The floor is cached per doc_type; a stale floor silently unblocks."""
+        make_doc(doc_type="cgu", version=1)
+        Acceptance.record(self.user, "cgu", 1)
+        self.assertEqual(Acceptance.pending_for(self.user), {})  # primes the cache
+        make_doc(doc_type="cgu", version=2, requires_reacceptance=True)
+        self.assertEqual(
+            Acceptance.pending_for(self.user), {"cgu": 2},
+            "save() must drop the floor cache, without an explicit cache.clear()",
+        )
 
     def test_acceptance_is_language_independent(self):
         """The design point behind building this instead of using a package.
@@ -230,8 +304,10 @@ class DocumentViewTests(TestCase):
         self.assertEqual(self.client.get("/consent/cgv/").status_code, 404)
 
     def test_fallback_shows_the_prevalence_notice(self):
+        # "en" rather than "ja": this test is about the notice appearing at all,
+        # so it reads the msgid instead of asserting on our own translation.
         make_doc(doc_type="cgu", language="fr")
-        with self.settings(LANGUAGE_CODE="ja"):
+        with self.settings(LANGUAGE_CODE="en"):
             resp = self.client.get("/consent/cgu/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "authoritative")
@@ -246,12 +322,40 @@ class DocumentViewTests(TestCase):
         self.assertContains(resp, "information only")
         self.assertNotContains(resp, "not available in your language")
 
-    def test_the_fallback_language_carries_no_notice(self):
+    def test_the_authoritative_language_carries_no_notice(self):
         make_doc(doc_type="cgu", language="fr")
         with self.settings(LANGUAGE_CODE="fr"):
             resp = self.client.get("/consent/cgu/")
         self.assertNotContains(resp, "information only")
         self.assertNotContains(resp, "not available in your language")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="de")
+    def test_the_notice_names_the_configured_language_not_french(self):
+        """A notice that hardcodes a language name lies as soon as someone
+        configures a different one — and it lies about which text binds them."""
+        make_doc(doc_type="cgu", language="de")
+        with self.settings(LANGUAGE_CODE="en"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "German")
+        self.assertNotContains(resp, "French")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="de")
+    def test_the_notice_names_the_language_in_the_readers_language(self):
+        """A Japanese reader is told "ドイツ語", not "Deutsch" and not "German":
+        the one sentence that says which text binds them must be readable."""
+        make_doc(doc_type="cgu", language="de")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "ドイツ語")
+
+    @override_settings(CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE="qqq-private")
+    def test_a_language_code_django_does_not_know_degrades_to_the_code(self):
+        """get_language_info raises on unknown codes. A legal notice must not 500."""
+        make_doc(doc_type="cgu", language="qqq-private")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "qqq-private")
 
     def test_body_is_sanitized_on_render(self):
         """Even if a row were tampered with directly in the DB."""
@@ -261,6 +365,37 @@ class DocumentViewTests(TestCase):
         )
         resp = self.client.get("/consent/cgu/")
         self.assertNotContains(resp, "<script")
+
+    def test_a_reader_sees_when_they_accepted(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        user = User.objects.create_user("bob", password="pw")
+        Acceptance.record(user, "cgu", 1)
+        self.client.force_login(user)
+        resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "You accepted this document on")
+
+    def test_anonymous_sees_no_acceptance_line(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        resp = self.client.get("/consent/cgu/")
+        self.assertNotContains(resp, "You accepted this document on")
+
+    def test_a_reader_who_never_accepted_sees_no_line(self):
+        make_doc(doc_type="cgu", language="fr", version=1)
+        self.client.force_login(User.objects.create_user("bob", password="pw"))
+        resp = self.client.get("/consent/cgu/")
+        self.assertNotContains(resp, "You accepted this document on")
+
+    def test_signing_an_older_version_is_said_so(self):
+        """Otherwise the page reads as "you agreed to this text", which is false
+        when the text on screen is a version they never saw."""
+        make_doc(doc_type="cgu", language="fr", version=1)
+        user = User.objects.create_user("bob", password="pw")
+        Acceptance.record(user, "cgu", 1)
+        cache.clear()
+        make_doc(doc_type="cgu", language="fr", version=2)
+        self.client.force_login(user)
+        resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "you signed version 1")
 
 
 class AcceptViewTests(TestCase):
@@ -273,33 +408,111 @@ class AcceptViewTests(TestCase):
         resp = self.client.get("/consent/accept/")
         self.assertEqual(resp.status_code, 302)
 
-    def test_submitting_without_ticking_is_refused_server_side(self):
+    def test_posting_no_document_records_nothing(self):
         """The HTML `required` attribute only stops a browser."""
         self.client.force_login(self.user)
         resp = self.client.post("/consent/accept/", {})
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
         self.assertEqual(Acceptance.objects.count(), 0)
 
-    def test_the_consent_screen_carries_the_language_notice(self):
-        """The page that records consent is where the caveat matters most."""
+    def test_posting_a_document_that_is_not_pending_records_nothing(self):
+        """A forged or stale doc_type must not create a phantom acceptance."""
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgv"})
+        self.assertEqual(Acceptance.objects.count(), 0)
+
+    def test_the_consent_screen_flags_a_language_fallback(self):
+        """Compact wording now, because the full notice lives on the document
+        page the user is required to open. Previously this screen inlined the
+        shared _language_notice.html; the caveat still travels with the binding
+        text, it is simply no longer duplicated in a one-line list."""
         self.client.force_login(self.user)
         with self.settings(LANGUAGE_CODE="ja"):
             resp = self.client.get("/consent/accept/")
-        self.assertContains(resp, "authoritative")
+        # The binding language is named from the setting, in the reader's own
+        # language — "フランス語" for a Japanese reader, not a hardcoded "French".
+        self.assertContains(resp, "フランス語")
+        self.assertContains(resp, "法的拘束力")
 
-    def test_ticking_records_the_proof_and_redirects(self):
+    def test_signing_records_the_proof_and_returns_to_the_screen(self):
+        """It no longer jumps straight to `next`: the user confirms with
+        Continue, so signing several documents does not bounce them off after
+        the first one."""
         self.client.force_login(self.user)
-        resp = self.client.post("/consent/accept/", {"accept": "1", "next": "/dashboard/"})
+        resp = self.client.post(
+            "/consent/accept/", {"doc_type": "cgu", "next": "/dashboard/"}
+        )
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, "/dashboard/")
+        self.assertIn("/consent/accept/", resp.url)
+        self.assertIn("next=%2Fdashboard%2F", resp.url)
         proof = Acceptance.objects.get(user=self.user, doc_type="cgu")
         self.assertEqual(proof.version, 1)
         self.assertIsNotNone(proof.accepted_at)
 
+    def test_each_post_signs_one_document_only(self):
+        """Why the timestamps end up genuinely different: one POST, one row.
+
+        A single form over every document stamped them all the same second,
+        which is a much weaker record than "privacy at 16:04, terms at 16:07".
+        """
+        make_doc(doc_type="cgv", version=1)
+        cache.clear()
+        self.client.force_login(self.user)
+
+        self.client.post("/consent/accept/", {"doc_type": "cgu"})
+        self.assertEqual(
+            sorted(Acceptance.objects.values_list("doc_type", flat=True)), ["cgu"]
+        )
+        self.assertEqual(Acceptance.pending_for(self.user), {"cgv": 1})
+
+        self.client.post("/consent/accept/", {"doc_type": "cgv"})
+        self.assertEqual(
+            sorted(Acceptance.objects.values_list("doc_type", flat=True)),
+            ["cgu", "cgv"],
+        )
+        self.assertEqual(Acceptance.pending_for(self.user), {})
+
+    def test_continue_is_inert_while_something_is_pending(self):
+        self.client.force_login(self.user)
+        resp = self.client.get("/consent/accept/")
+        self.assertContains(resp, "disabled")
+        self.assertContains(resp, "still needs your signature")
+
+    def test_continue_becomes_a_link_once_everything_is_signed(self):
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgu", "next": "/dashboard/"})
+        resp = self.client.get("/consent/accept/?next=/dashboard/&signed=1")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/dashboard/"')
+        self.assertNotContains(resp, "still needs your signature")
+
+    def test_every_title_links_to_its_document_even_once_signed(self):
+        """Once signed, the "Go to sign" button is gone. Without a linked title
+        there is no way left to reopen the text you just agreed to."""
+        self.client.force_login(self.user)
+        self.client.post("/consent/accept/", {"doc_type": "cgu"})
+        resp = self.client.get("/consent/accept/?signed=1")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/consent/cgu/"')
+        self.assertContains(resp, 'target="_blank"')
+        self.assertNotContains(resp, "Go to sign")   # nothing left to sign
+
+    def test_nothing_to_sign_and_no_signature_just_made_leaves_the_screen(self):
+        """Otherwise the URL is a dead end for anyone who lands on it."""
+        self.client.force_login(self.user)
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get("/consent/accept/?next=/inventory/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, "/inventory/")
+
 
 class OpenRedirectTests(TestCase):
     """The acceptance screen is seen by every user after a terms update, so an
-    unvalidated `next` is a first-rate phishing vector."""
+    unvalidated `next` is a first-rate phishing vector.
+
+    The POST now returns to this screen rather than following `next`, so the
+    hostile value has three places to leak from: the round-trip URL, the hidden
+    input, and the Continue link. All three are checked."""
 
     def setUp(self):
         cache.clear()
@@ -307,33 +520,92 @@ class OpenRedirectTests(TestCase):
         make_doc(doc_type="cgu", version=1)
         self.client.force_login(self.user)
 
-    def test_absolute_external_url_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "https://evil.example/login"}
+    def _sign(self, next_value):
+        return self.client.post(
+            "/consent/accept/", {"doc_type": "cgu", "next": next_value}
         )
-        self.assertEqual(resp.url, "/")
 
-    def test_protocol_relative_url_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "//evil.example/login"}
-        )
-        self.assertEqual(resp.url, "/")
+    def test_absolute_external_url_is_dropped_from_the_round_trip(self):
+        resp = self._sign("https://evil.example/login")
+        self.assertNotIn("evil.example", resp.url)
 
-    def test_javascript_scheme_is_refused(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "javascript:alert(1)"}
-        )
-        self.assertEqual(resp.url, "/")
+    def test_protocol_relative_url_is_dropped(self):
+        resp = self._sign("//evil.example/login")
+        self.assertNotIn("evil.example", resp.url)
+
+    def test_javascript_scheme_is_dropped(self):
+        resp = self._sign("javascript:alert(1)")
+        self.assertNotIn("javascript", resp.url)
 
     def test_internal_path_is_kept(self):
-        resp = self.client.post(
-            "/consent/accept/", {"accept": "1", "next": "/inventory/"}
-        )
-        self.assertEqual(resp.url, "/inventory/")
+        resp = self._sign("/inventory/")
+        self.assertIn("next=%2Finventory%2F", resp.url)
 
     def test_hostile_next_never_reaches_the_hidden_input(self):
         resp = self.client.get("/consent/accept/?next=https://evil.example/login")
         self.assertNotContains(resp, "evil.example")
+
+    def test_hostile_next_never_becomes_the_continue_link(self):
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get(
+            "/consent/accept/?signed=1&next=https://evil.example/login"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "evil.example")
+
+    def test_the_leave_redirect_also_validates_next(self):
+        Acceptance.record(self.user, "cgu", 1)
+        resp = self.client.get("/consent/accept/?next=https://evil.example/login")
+        self.assertEqual(resp.url, "/")
+
+
+class RenderedCommentTests(TestCase):
+    """No template comment may reach the browser.
+
+    Django's short comment form spans ONE line only; written across several it is
+    emitted verbatim. That shipped three times — on the signup page, on the
+    layout bridge, and on the public legal documents, where visitors read
+    paragraphs of developer prose in the middle of the terms. Structural checks
+    all passed, because none of them looked at what the page actually says.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user("bob", password="pw")
+
+    def assertNoTemplateComment(self, resp, where):
+        body = resp.content.decode("utf-8", "replace")
+        for marker in ("{#", "#}", "{% comment", "endcomment %}"):
+            self.assertNotIn(
+                marker, body,
+                f"{where}: {marker!r} reached the browser — a multi-line "
+                f"short comment is rendered as text, use {{% comment %}}",
+            )
+
+    def test_document_page_is_clean(self):
+        make_doc(doc_type="cgu", language="fr")
+        self.assertNoTemplateComment(self.client.get("/consent/cgu/"), "/consent/cgu/")
+
+    def test_document_page_is_clean_on_a_language_fallback(self):
+        """_language_notice.html is where the worst offender lived."""
+        make_doc(doc_type="cgu", language="fr")
+        with self.settings(LANGUAGE_CODE="ja"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertNoTemplateComment(resp, "/consent/cgu/ (fallback)")
+
+    def test_acceptance_screen_is_clean(self):
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.user)
+        self.assertNoTemplateComment(
+            self.client.get("/consent/accept/"), "/consent/accept/"
+        )
+
+    def test_my_consents_is_clean(self):
+        make_doc(doc_type="cgu", version=1)
+        self.client.force_login(self.user)
+        self.assertNoTemplateComment(
+            self.client.get("/consent/my-consents/"), "/consent/my-consents/"
+        )
 
 
 def exploding_resolver(user):
@@ -458,3 +730,42 @@ class TemplateTagTests(TestCase):
 
     def test_empty_when_nothing_published(self):
         self.assertEqual(self._render(), "")
+
+
+class ShippedCatalogueTests(TestCase):
+    """The package ships its own compiled catalogues in consent_trail/locale/.
+
+    These tests fail if the .mo files are missing, stale, or not picked up —
+    which is exactly what happens when someone edits a .po and forgets
+    `compilemessages`, or when a packaging change drops locale/ from the wheel.
+    A silently English consent screen is the failure mode they prevent.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def test_django_picks_up_the_packages_own_catalogue(self):
+        """No LOCALE_PATHS involved: Django merges an installed app's catalogue
+        on its own. This is what lets a host project configure nothing."""
+        from django.utils.translation import gettext, override
+        with override("fr"):
+            self.assertEqual(gettext("Signed"), "Signé")
+        with override("ja"):
+            self.assertEqual(gettext("Signed"), "署名済み")
+
+    def test_the_consent_screen_is_translated_end_to_end(self):
+        make_doc(doc_type="cgu", language="fr", requires_acceptance=True)
+        user = User.objects.create_user("bob", password="pw")
+        self.client.force_login(user)
+        with self.settings(LANGUAGE_CODE="fr"):
+            resp = self.client.get("/consent/accept/")
+        self.assertContains(resp, "Nos conditions ont changé")
+
+    def test_the_prevalence_notice_is_translated_with_its_placeholder_intact(self):
+        """A translation that drops %(lang)s renders a notice naming no language
+        at all — worse than English, because it still claims something binds."""
+        make_doc(doc_type="cgu", language="fr")
+        with self.settings(LANGUAGE_CODE="es"):
+            resp = self.client.get("/consent/cgu/")
+        self.assertContains(resp, "Solo la versión en")
+        self.assertContains(resp, "prevalece")

@@ -4,37 +4,70 @@
 {% block title %}{{ doc.title }}{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-  <div class="row justify-content-center">
-    <div class="col-lg-9">
+<div class="container-fluid px-3 px-md-4 py-5">
+  <div class="ct-doc mx-auto">
 
-      <h1 class="h3 mb-2">{{ doc.title }}</h1>
-      <p class="text-secondary small mb-4">
-        {% trans "Version" %} {{ doc.version }}
-        {% if doc.published_at %}— {% trans "in force since" %} {{ doc.published_at|date:"d/m/Y" }}{% endif %}
-      </p>
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+      <div>
+        <h1 class="h3 mb-2">{{ doc.title }}</h1>
+        <p class="text-secondary small mb-0">
+          {% trans "Version" %} {{ doc.version }}
+          {% if doc.published_at %}— {% trans "in force since" %} {{ doc.published_at|date:"d/m/Y" }}{% endif %}
+        </p>
 
-      {% include "consent_trail/_language_notice.html" %}
+        {% if acceptance %}
+          {% comment %}
+            A plain check character rather than an icon font: this app must render
+            in a host project that may not ship Bootstrap Icons.
+          {% endcomment %}
+          <p class="small mb-0 mt-1 ct-signed">
+            ✓
+            {% blocktrans with when=acceptance.accepted_at|date:"d/m/Y" at=acceptance.accepted_at|date:"H:i" %}You accepted this document on {{ when }} at {{ at }}{% endblocktrans %}
+            {% if acceptance.version != doc.version %}
+              <span class="ct-signed-stale">
+                — {% blocktrans with signed=acceptance.version %}you signed version {{ signed }}{% endblocktrans %}
+              </span>
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
 
-      <article class="ct-body">{{ body }}</article>
-
-      <hr class="my-4">
-      <p class="small text-secondary d-print-none">
-        <a href="javascript:window.print()">{% trans "Print or save as PDF" %}</a>
-      </p>
-
+      {% comment %}
+        A javascript: href rather than a button, to keep this template free of
+        script. Permitted by the current CSP, which carries 'unsafe-inline' in
+        script-src — if that is ever tightened (DC-158), this becomes a button
+        with a listener.
+      {% endcomment %}
+      <a href="javascript:window.print()"
+         class="btn btn-sm btn-outline-secondary flex-shrink-0 d-print-none">
+        {% trans "Print or save as PDF" %}
+      </a>
     </div>
+
+    {% include "consent_trail/_language_notice.html" %}
+
+    <article class="ct-body">{{ body }}</article>
+
   </div>
 </div>
 
 <style>
-  .ct-body h2 { font-size: 1.25rem; margin-top: 2rem; }
-  .ct-body h3 { font-size: 1.05rem; margin-top: 1.5rem; }
+  /* Wide enough not to waste the window, capped so lines stay readable:
+     legal prose set across 2500px is unreadable, not generous. */
+  .ct-doc { max-width: 1100px; }
+  /* Distinct from the grey version line right above it: this one is about the
+     reader, not about the document. */
+  .ct-signed { color: #198754; font-weight: 600; }
+  .ct-signed-stale { color: #997404; font-weight: 400; }
+  .ct-body { font-size: 1.05rem; line-height: 1.75; }
+  .ct-body h2 { font-size: 1.3rem; margin-top: 2rem; }
+  .ct-body h3 { font-size: 1.1rem; margin-top: 1.5rem; }
   .ct-body table { width: 100%; margin: 1rem 0; }
-  .ct-body th, .ct-body td { border: 1px solid #dee2e6; padding: .4rem .6rem; }
+  .ct-body th, .ct-body td { border: 1px solid #dee2e6; padding: .45rem .7rem; vertical-align: top; }
   @media print {
     .d-print-none, nav, footer { display: none !important; }
-    .ct-body { font-size: 11pt; }
+    .ct-doc { max-width: none; }
+    .ct-body { font-size: 11pt; line-height: 1.5; }
   }
 </style>
 {% endblock %}

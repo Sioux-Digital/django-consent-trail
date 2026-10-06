@@ -12,3 +12,10 @@ htmlcov/
 .pytest_cache/
 .tox/
 .DS_Store
+# A library pins nothing: resolution is the host project's business.
+uv.lock
+# Internal working notes — this repo is public, these stay local. Ignored and
+# not merely untracked, so a `git add -A` cannot sweep them in by accident.
+CLAUDE.md
+# NB: *.mo is deliberately NOT ignored — the compiled catalogues ship with the
+# package so an editable install needs no build step. See CLAUDE.md.

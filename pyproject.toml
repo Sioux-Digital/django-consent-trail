@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-consent-trail"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Versioned, multilingual legal documents for Django — with timestamped proof of who accepted what, and when."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ classifiers = [
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.2",
     "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -41,3 +42,10 @@ Changelog = "https://github.com/Sioux-Digital/django-consent-trail/blob/main/CHA
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/consent_trail"]
+
+[tool.hatch.build.targets.sdist]
+# The sdist is a public download on PyPI. .gitignore alone does not protect it:
+# hatchling only honours it when building from inside a git checkout, so a build
+# from an exported tarball would put these back in. A PyPI release can never be
+# re-uploaded under the same version, so this has to be explicit.
+exclude = ["CLAUDE.md", ".github", "uv.lock"]

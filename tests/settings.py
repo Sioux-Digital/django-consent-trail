@@ -41,6 +41,11 @@ TEMPLATES = [{
 STATIC_URL = "/static/"
 USE_TZ = True
 USE_I18N = True
-LANGUAGE_CODE = "fr"
+# "en" so UI assertions read the msgids themselves. The package now ships
+# compiled catalogues, so running the suite under "fr" would translate every
+# page and make an assertion on wording a test of our own translation rather
+# than of the view. Tests that care about a language set it locally with
+# `self.settings(LANGUAGE_CODE=...)`.
+LANGUAGE_CODE = "en"
 LANGUAGES = [("en", "English"), ("fr", "Francais"), ("es", "Espanol"), ("ja", "Japanese")]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

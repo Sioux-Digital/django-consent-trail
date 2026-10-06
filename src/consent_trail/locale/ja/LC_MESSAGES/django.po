@@ -1,0 +1,309 @@
+# django-consent-trail — Japanese translation.
+# Copyright (C) 2026 William Touzalin
+# This file is distributed under the same license as the
+# django-consent-trail package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: django-consent-trail 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/Sioux-Digital/django-consent-trail/issues\n"
+"POT-Creation-Date: 2026-10-06 09:01+0200\n"
+"PO-Revision-Date: 2026-10-06\n"
+"Last-Translator: William Touzalin\n"
+"Language-Team: none\n"
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+
+#: admin.py:19
+msgid "Publication"
+msgstr "出版"
+
+#: admin.py:23
+msgid "Tick 'Force re-acceptance' ONLY for a substantive change: it blocks every user until they accept again. Never tick it for a typo fix."
+msgstr "実質的な変更の場合にのみ「Force re-acceptance」にチェックしてください。これをオンにすると、ユーザーは再度受諾するまでブロックされます。誤字の修正だけの場合はチェックしないでください。"
+
+#: admin.py:129 templates/consent_trail/admin/pending.html:5
+msgid "Pending acceptances"
+msgstr "保留中の承認"
+
+#: apps.py:8
+msgid "Legal documents & consent"
+msgstr "法的文書と同意"
+
+#: forms.py:20
+msgid "I have read and accept the Terms of Use and the Privacy Policy."
+msgstr "利用規約およびプライバシーポリシーを読み、同意します。"
+
+#: forms.py:22
+msgid "You must accept the terms to create an account."
+msgstr "アカウントを作成するには、利用規約に同意する必要があります。"
+
+#: models.py:30
+msgid "Legal notice"
+msgstr "法的通知"
+
+#: models.py:31
+msgid "Privacy policy"
+msgstr "プライバシーポリシー"
+
+#: models.py:32
+msgid "Terms of use"
+msgstr "利用規約"
+
+#: models.py:33
+msgid "Terms of sale"
+msgstr "販売規約"
+
+#: models.py:48 templates/consent_trail/admin/pending.html:11
+#: templates/consent_trail/my_consents.html:20
+msgid "Document"
+msgstr "ドキュメント"
+
+#: models.py:50
+msgid "Language"
+msgstr "言語"
+
+#: models.py:51
+msgid "Language code, e.g. fr. Same version number across languages."
+msgstr "言語コード（例: fr）。各言語で同じバージョン番号。"
+
+#: models.py:54 templates/consent_trail/accept.html:38
+#: templates/consent_trail/document.html:14
+#: templates/consent_trail/my_consents.html:21
+msgid "Version"
+msgstr "バージョン"
+
+#: models.py:55
+msgid "Shared by every language of the same document version."
+msgstr "同一文書バージョンのすべての言語で共有されます"
+
+#: models.py:58
+msgid "Title"
+msgstr "タイトル"
+
+#: models.py:59
+msgid "Body"
+msgstr "本文"
+
+#: models.py:62
+msgid "Audience"
+msgstr "オーディエンス"
+
+#: models.py:64
+msgid "Leave empty to target every user. Otherwise an audience tag your project resolves, e.g. org:3f2b… — see CONSENT_TRAIL_AUDIENCE_RESOLVER."
+msgstr "すべてのユーザーを対象にする場合は空欄にしてください。それ以外の場合は、プロジェクトが解決するオーディエンスタグを入力してください（例: org:3f2b…）。CONSENT_TRAIL_AUDIENCE_RESOLVER を参照してください。"
+
+#: models.py:70
+msgid "Current version"
+msgstr "現在のバージョン"
+
+#: models.py:71
+msgid "Only one version per document and language can be current."
+msgstr "文書と各言語につき、現在のバージョンは1つだけです。"
+
+#: models.py:73
+msgid "Published at"
+msgstr "公開日時"
+
+#: models.py:76
+msgid "Must be accepted"
+msgstr "必ず受諾が必要です"
+
+#: models.py:77
+msgid "Legal notices are informational — untick for those."
+msgstr "法的通知は情報提供です—それらのチェックは外してください"
+
+#: models.py:80
+msgid "Force re-acceptance"
+msgstr "再受諾を強制"
+
+#: models.py:82
+msgid "Tick ONLY for a substantive change. Ticked, every user is blocked until they accept again — do not tick for a typo fix."
+msgstr "実質的な変更の場合のみチェックしてください。チェックすると、すべてのユーザーが再度承諾するまでブロックされます — 誤字修正のためにチェックしないでください。"
+
+#: models.py:102
+msgid "Legal document"
+msgstr "法的文書"
+
+#: models.py:103
+msgid "Legal documents"
+msgstr "法的文書"
+
+#: models.py:267
+msgid "Language actually displayed when consent was given."
+msgstr "同意が得られたときに実際に表示される言語"
+
+#: models.py:284
+msgid "Legal acceptance"
+msgstr "法的同意"
+
+#: models.py:285
+msgid "Legal acceptances"
+msgstr "法的同意"
+
+#: templates/consent_trail/_language_notice.html:18
+#, python-format
+msgid "This document is not available in your language. Only the %(lang)s version is authoritative."
+msgstr "この文書はご利用の言語では提供されていません。%(lang)s バージョンのみが正文です。"
+
+#: templates/consent_trail/_language_notice.html:22
+#, python-format
+msgid "This translation is provided for information only. Only the %(lang)s version is legally binding."
+msgstr "この翻訳は参考情報として提供されています。法的拘束力があるのは %(lang)s バージョンのみです。"
+
+#: templates/consent_trail/accept.html:4
+msgid "Please review our updated terms"
+msgstr "更新された利用規約をご確認ください"
+
+#: templates/consent_trail/accept.html:14
+msgid "Our terms have changed"
+msgstr "利用規約が変更されました"
+
+#: templates/consent_trail/accept.html:16
+msgid "Open each document, then confirm you accept it. Each one is signed separately."
+msgstr "各文書を開き、受諾したことを確認してください。各文書は個別に署名されています。"
+
+#: templates/consent_trail/accept.html:40
+#, python-format
+msgid "shown in another language — only the %(lang)s version is binding"
+msgstr "別の言語で表示 — %(lang)s バージョンのみが法的拘束力を持ちます"
+
+#: templates/consent_trail/accept.html:50
+msgid "Go to sign"
+msgstr "サインへ移動"
+
+#: templates/consent_trail/accept.html:54
+msgid "Signed"
+msgstr "署名済み"
+
+#: templates/consent_trail/accept.html:75
+msgid "I have read and accept this document"
+msgstr "本書類を読み、同意します"
+
+#: templates/consent_trail/accept.html:79
+msgid "Open the document first to enable this."
+msgstr "この機能を有効にするには、まずドキュメントを開いてください。"
+
+#: templates/consent_trail/accept.html:85
+msgid "Accept this document"
+msgstr "この文書を承諾する"
+
+#: templates/consent_trail/accept.html:91
+#, python-format
+msgid "Accepted on %(when)s"
+msgstr "受諾日時 %(when)s"
+
+#: templates/consent_trail/accept.html:101
+#: templates/consent_trail/accept.html:108
+msgid "Continue"
+msgstr "続行"
+
+#: templates/consent_trail/accept.html:104
+#, python-format
+msgid "One document still needs your signature."
+msgid_plural "%(counter)s documents still need your signature."
+msgstr[0] "%(counter)s 件の文書がまだ署名を必要としています。"
+
+#: templates/consent_trail/admin/pending.html:7
+msgid "Users who have not yet accepted the current version of each document."
+msgstr "各文書の現在のバージョンをまだ受諾していないユーザー"
+
+#: templates/consent_trail/admin/pending.html:13
+msgid "All"
+msgstr "すべて"
+
+#: templates/consent_trail/admin/pending.html:18
+msgid "Filter"
+msgstr "フィルタ"
+
+#: templates/consent_trail/admin/pending.html:24
+msgid "version"
+msgstr "バージョン"
+
+#: templates/consent_trail/admin/pending.html:26
+msgid "audience"
+msgstr "聴衆"
+
+#: templates/consent_trail/admin/pending.html:28
+msgid "pending"
+msgstr "保留中"
+
+#: templates/consent_trail/admin/pending.html:33
+msgid "User"
+msgstr "ユーザー"
+
+#: templates/consent_trail/admin/pending.html:33
+msgid "Email"
+msgstr "メール"
+
+#: templates/consent_trail/admin/pending.html:43
+msgid "previous"
+msgstr "前へ"
+
+#: templates/consent_trail/admin/pending.html:45
+#, python-format
+msgid "page %(n)s of %(t)s"
+msgstr "ページ %(n)s の %(t)s"
+
+#: templates/consent_trail/admin/pending.html:47
+msgid "next"
+msgstr "次へ"
+
+#: templates/consent_trail/admin/pending.html:52
+msgid "Everyone has accepted this version."
+msgstr "全員がこのバージョンを受け入れました。"
+
+#: templates/consent_trail/admin/pending.html:56
+msgid "No document currently requires acceptance."
+msgstr "現在、受諾が必要な文書はありません。"
+
+#: templates/consent_trail/base.html:10
+msgid "Legal"
+msgstr "法的情報"
+
+#: templates/consent_trail/document.html:15
+msgid "in force since"
+msgstr "施行開始日"
+
+#: templates/consent_trail/document.html:26
+#, python-format
+msgid "You accepted this document on %(when)s at %(at)s"
+msgstr "あなたは %(when)s の %(at)s にこの文書を受け入れました"
+
+#: templates/consent_trail/document.html:29
+#, python-format
+msgid "you signed version %(signed)s"
+msgstr "バージョン %(signed)s に署名しました"
+
+#: templates/consent_trail/document.html:45
+msgid "Print or save as PDF"
+msgstr "印刷またはPDFとして保存"
+
+#: templates/consent_trail/my_consents.html:4
+#: templates/consent_trail/my_consents.html:11
+msgid "My consents"
+msgstr "私の同意"
+
+#: templates/consent_trail/my_consents.html:13
+msgid "The documents you accepted, and when."
+msgstr "受け入れた文書と、その日時"
+
+#: templates/consent_trail/my_consents.html:22
+msgid "Accepted on"
+msgstr "受諾日"
+
+#: templates/consent_trail/my_consents.html:31
+msgid "superseded"
+msgstr "置き換え済み"
+
+#: templates/consent_trail/my_consents.html:41
+msgid "not accepted yet"
+msgstr "まだ受諾されていません"
+
+#: templates/consent_trail/my_consents.html:46
+msgid "Nothing to show yet."
+msgstr "まだ表示するものがありません。"

@@ -6,101 +6,146 @@
 {% block content %}
 <div class="container py-5">
   <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-md-8 col-lg-6">
 
-      <h1 class="h4 mb-3">{% trans "Our terms have changed" %}</h1>
-      <p class="text-secondary">
-        {% blocktrans %}Please read the documents below and accept them to continue.{% endblocktrans %}
-      </p>
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
 
-      {% if error %}
-        <div class="alert alert-danger" role="alert">
-          {% trans "You must tick the box to continue." %}
-        </div>
-      {% endif %}
+          <h1 class="h5 mb-1">{% trans "Our terms have changed" %}</h1>
+          <p class="text-secondary small mb-4">
+            {% blocktrans %}Open each document, then confirm you accept it. Each one is signed separately.{% endblocktrans %}
+          </p>
 
-      <form method="post" id="ct-form">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next }}">
+          <ul class="list-group list-group-flush mb-4" id="ct-rows">
+            {% for row in rows %}
+              <li class="list-group-item px-0 py-3" data-ct-row>
 
-        {% for item in documents %}
-          <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <strong>{{ item.doc.title }}</strong>
-              <a href="{% url 'consent_trail:document' item.doc.doc_type %}"
-                 target="_blank" rel="noopener" class="small">
-                {% trans "Open in a new tab" %}
-              </a>
+                <div class="d-flex justify-content-between align-items-center gap-3">
+                  <div class="me-auto">
+                    {% comment %}
+                      The title is a link on EVERY row, signed ones included: once
+                      a document is signed its "Go to sign" button disappears, and
+                      without this there is no way left to reopen the text you
+                      just agreed to.
+                    {% endcomment %}
+                    <a href="{% url 'consent_trail:document' row.doc_type %}"
+                       target="_blank" rel="noopener"
+                       class="fw-semibold text-decoration-none">
+                      {{ row.doc.title }}
+                    </a>
+                    <div class="text-secondary small">
+                      {% trans "Version" %} {{ row.version }}
+                      {% if row.is_fallback %}
+                        · {% blocktrans with lang=authoritative_language_name %}shown in another language — only the {{ lang }} version is binding{% endblocktrans %}
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  {% if row.pending %}
+                    <a href="{% url 'consent_trail:document' row.doc_type %}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-primary flex-shrink-0"
+                       data-ct-open>
+                      {% trans "Go to sign" %}
+                    </a>
+                  {% else %}
+                    <span class="badge text-bg-success flex-shrink-0">
+                      {% trans "Signed" %}
+                    </span>
+                  {% endif %}
+                </div>
+
+                {% if row.pending %}
+                  {% comment %}
+                    One form per document: its own POST, therefore its own
+                    timestamp. A single form over every document would stamp them
+                    all the same second and lose that.
+                  {% endcomment %}
+                  <form method="post" class="mt-2" data-ct-sign>
+                    {% csrf_token %}
+                    <input type="hidden" name="doc_type" value="{{ row.doc_type }}">
+                    <input type="hidden" name="next" value="{{ next }}">
+
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox"
+                             id="ct-box-{{ row.doc_type }}" data-ct-box>
+                      <label class="form-check-label small" for="ct-box-{{ row.doc_type }}">
+                        {% trans "I have read and accept this document" %}
+                      </label>
+                    </div>
+                    <div class="form-text" data-ct-hint>
+                      {% trans "Open the document first to enable this." %}
+                    </div>
+
+                    {# Without JavaScript the checkbox cannot submit on its own. #}
+                    <noscript>
+                      <button type="submit" class="btn btn-sm btn-primary mt-2">
+                        {% trans "Accept this document" %}
+                      </button>
+                    </noscript>
+                  </form>
+                {% elif row.acceptance %}
+                  <div class="text-secondary small mt-2">
+                    {% blocktrans with when=row.acceptance.accepted_at|date:"d/m/Y H:i" %}Accepted on {{ when }}{% endblocktrans %}
+                  </div>
+                {% endif %}
+
+              </li>
+            {% endfor %}
+          </ul>
+
+          {% if pending_count %}
+            <button type="button" class="btn btn-primary w-100" disabled>
+              {% trans "Continue" %}
+            </button>
+            <div class="form-text text-center">
+              {% blocktrans count counter=pending_count %}One document still needs your signature.{% plural %}{{ counter }} documents still need your signature.{% endblocktrans %}
             </div>
-            {# Scrollable so the text is genuinely presented, not just linked.
-               Reaching the bottom is what enables the checkbox below. #}
-            <div class="card-body ct-scroll" data-ct-scroll
-                 style="max-height:320px; overflow-y:auto;">
-              {# Outside the scroll pane would be nicer visually, but consent is
-                 the point: the caveat has to sit with the text it qualifies. #}
-              {% include "consent_trail/_language_notice.html" with doc=item.doc is_fallback=item.is_fallback %}
-              <div class="ct-body">{{ item.body }}</div>
-            </div>
-          </div>
-        {% endfor %}
+          {% else %}
+            <a href="{{ continue_url }}" class="btn btn-primary w-100">
+              {% trans "Continue" %}
+            </a>
+          {% endif %}
 
-        <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" name="accept" id="ct-accept" value="1">
-          <label class="form-check-label" for="ct-accept">
-            {% trans "I have read and accept these documents." %}
-          </label>
-          <div class="form-text" id="ct-hint">
-            {% trans "Scroll to the end of each document to enable this." %}
-          </div>
         </div>
-
-        <button type="submit" class="btn btn-primary" id="ct-submit">
-          {% trans "Accept and continue" %}
-        </button>
-      </form>
+      </div>
 
     </div>
   </div>
 </div>
 
-<style>
-  .ct-body h2 { font-size: 1.15rem; margin-top: 1.5rem; }
-  .ct-body h3 { font-size: 1rem; margin-top: 1.2rem; }
-  .ct-body table { width: 100%; margin: .75rem 0; }
-  .ct-body th, .ct-body td { border: 1px solid #dee2e6; padding: .35rem .5rem; }
-</style>
-
 <script>
-/* Enable the checkbox only once every document has been scrolled to its end.
- * Progressive enhancement: with JavaScript off the checkbox simply stays
- * usable, because the server is what actually enforces consent. Never gate a
- * legal requirement on client-side code alone.
+/* Gate each row's checkbox on having opened its document, and submit on tick.
+ *
+ * Progressive enhancement, in the safe direction: the checkbox ships ENABLED in
+ * the HTML and JavaScript is what disables it. Shipping it disabled would lock
+ * every user out of the site the day a script fails to load — and this screen
+ * blocks the whole application. Opening a link is a nudge, not proof of reading;
+ * the server records consent on the POST regardless.
  */
 (function () {
-  var panes = Array.prototype.slice.call(document.querySelectorAll('[data-ct-scroll]'));
-  var box = document.getElementById('ct-accept');
-  var hint = document.getElementById('ct-hint');
-  if (!panes.length || !box) return;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ct-row]'), function (row) {
+    var form = row.querySelector('[data-ct-sign]');
+    if (!form) return;                       // already signed
+    var box = form.querySelector('[data-ct-box]');
+    var hint = form.querySelector('[data-ct-hint]');
+    var link = row.querySelector('[data-ct-open]');
+    if (!box || !link) return;
 
-  var seen = new Array(panes.length).fill(false);
+    box.disabled = true;
 
-  function check(i, el) {
-    // A pane shorter than its max-height never scrolls — count it as read.
-    if (el.scrollHeight - el.clientHeight <= 2) { seen[i] = true; return; }
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) seen[i] = true;
-  }
+    link.addEventListener('click', function () {
+      box.disabled = false;
+      if (hint) hint.hidden = true;
+    });
 
-  function refresh() {
-    var all = seen.every(Boolean);
-    box.disabled = !all;
-    hint.hidden = all;
-  }
-
-  panes.forEach(function (el, i) {
-    check(i, el);
-    el.addEventListener('scroll', function () { check(i, el); refresh(); }, { passive: true });
+    box.addEventListener('change', function () {
+      if (box.checked) {
+        box.disabled = true;                 // no double submit
+        form.submit();
+      }
+    });
   });
-  refresh();
 })();
 </script>
 {% endblock %}

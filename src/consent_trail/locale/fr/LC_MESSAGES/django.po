@@ -1,0 +1,310 @@
+# django-consent-trail — French translation.
+# Copyright (C) 2026 William Touzalin
+# This file is distributed under the same license as the
+# django-consent-trail package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: django-consent-trail 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/Sioux-Digital/django-consent-trail/issues\n"
+"POT-Creation-Date: 2026-10-06 09:01+0200\n"
+"PO-Revision-Date: 2026-10-06\n"
+"Last-Translator: William Touzalin\n"
+"Language-Team: none\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+
+#: admin.py:19
+msgid "Publication"
+msgstr "Publication"
+
+#: admin.py:23
+msgid "Tick 'Force re-acceptance' ONLY for a substantive change: it blocks every user until they accept again. Never tick it for a typo fix."
+msgstr "Cochez 'Force re-acceptance' UNIQUEMENT pour une modification substantielle : cela bloque chaque utilisateur jusqu'à ce qu'il accepte à nouveau. Ne cochez jamais cela pour une correction de faute de frappe."
+
+#: admin.py:129 templates/consent_trail/admin/pending.html:5
+msgid "Pending acceptances"
+msgstr "Acceptations en attente"
+
+#: apps.py:8
+msgid "Legal documents & consent"
+msgstr "Documents légaux & consentement"
+
+#: forms.py:20
+msgid "I have read and accept the Terms of Use and the Privacy Policy."
+msgstr "J'ai lu et j'accepte les Conditions d'utilisation et la Politique de confidentialité."
+
+#: forms.py:22
+msgid "You must accept the terms to create an account."
+msgstr "Vous devez accepter les conditions pour créer un compte."
+
+#: models.py:30
+msgid "Legal notice"
+msgstr "Mentions légales"
+
+#: models.py:31
+msgid "Privacy policy"
+msgstr "Politique de confidentialité"
+
+#: models.py:32
+msgid "Terms of use"
+msgstr "Conditions d’utilisation"
+
+#: models.py:33
+msgid "Terms of sale"
+msgstr "Conditions de vente"
+
+#: models.py:48 templates/consent_trail/admin/pending.html:11
+#: templates/consent_trail/my_consents.html:20
+msgid "Document"
+msgstr "Document"
+
+#: models.py:50
+msgid "Language"
+msgstr "Langue"
+
+#: models.py:51
+msgid "Language code, e.g. fr. Same version number across languages."
+msgstr "Code de langue, par ex. fr. Même numéro de version pour toutes les langues."
+
+#: models.py:54 templates/consent_trail/accept.html:38
+#: templates/consent_trail/document.html:14
+#: templates/consent_trail/my_consents.html:21
+msgid "Version"
+msgstr "Version"
+
+#: models.py:55
+msgid "Shared by every language of the same document version."
+msgstr "Partagé par chaque langue de la même version du document."
+
+#: models.py:58
+msgid "Title"
+msgstr "Titre"
+
+#: models.py:59
+msgid "Body"
+msgstr "Corps"
+
+#: models.py:62
+msgid "Audience"
+msgstr "Public"
+
+#: models.py:64
+msgid "Leave empty to target every user. Otherwise an audience tag your project resolves, e.g. org:3f2b… — see CONSENT_TRAIL_AUDIENCE_RESOLVER."
+msgstr "Laissez vide pour cibler tous les utilisateurs. Sinon, un tag d’audience résolu par votre projet, par ex. org:3f2b… — voir CONSENT_TRAIL_AUDIENCE_RESOLVER."
+
+#: models.py:70
+msgid "Current version"
+msgstr "Version actuelle"
+
+#: models.py:71
+msgid "Only one version per document and language can be current."
+msgstr "Une seule version par document et langue peut être actuelle."
+
+#: models.py:73
+msgid "Published at"
+msgstr "Publié le"
+
+#: models.py:76
+msgid "Must be accepted"
+msgstr "Doit être accepté"
+
+#: models.py:77
+msgid "Legal notices are informational — untick for those."
+msgstr "Les avis légaux sont informatifs — décochez‑les."
+
+#: models.py:80
+msgid "Force re-acceptance"
+msgstr "Forcer la réacceptation"
+
+#: models.py:82
+msgid "Tick ONLY for a substantive change. Ticked, every user is blocked until they accept again — do not tick for a typo fix."
+msgstr "Cochez UNIQUEMENT pour un changement substantiel. Une fois coché, chaque utilisateur est bloqué jusqu'à ce qu'il accepte à nouveau — ne cochez pas pour une correction de coquille."
+
+#: models.py:102
+msgid "Legal document"
+msgstr "Document juridique"
+
+#: models.py:103
+msgid "Legal documents"
+msgstr "Documents juridiques"
+
+#: models.py:267
+msgid "Language actually displayed when consent was given."
+msgstr "Langue réellement affichée lorsque le consentement a été donné."
+
+#: models.py:284
+msgid "Legal acceptance"
+msgstr "Acceptation légale"
+
+#: models.py:285
+msgid "Legal acceptances"
+msgstr "Acceptations légales"
+
+#: templates/consent_trail/_language_notice.html:18
+#, python-format
+msgid "This document is not available in your language. Only the %(lang)s version is authoritative."
+msgstr "Ce document n’est pas disponible dans votre langue. Seule la version %(lang)s fait foi."
+
+#: templates/consent_trail/_language_notice.html:22
+#, python-format
+msgid "This translation is provided for information only. Only the %(lang)s version is legally binding."
+msgstr "Cette traduction est fournie à titre informatif uniquement. Seule la version %(lang)s est juridiquement contraignante."
+
+#: templates/consent_trail/accept.html:4
+msgid "Please review our updated terms"
+msgstr "Veuillez consulter nos conditions mises à jour"
+
+#: templates/consent_trail/accept.html:14
+msgid "Our terms have changed"
+msgstr "Nos conditions ont changé"
+
+#: templates/consent_trail/accept.html:16
+msgid "Open each document, then confirm you accept it. Each one is signed separately."
+msgstr "Ouvrez chaque document, puis confirmez que vous l’acceptez. Chacun est signé séparément."
+
+#: templates/consent_trail/accept.html:40
+#, python-format
+msgid "shown in another language — only the %(lang)s version is binding"
+msgstr "affiché dans une autre langue — seule la version %(lang)s est contraignante"
+
+#: templates/consent_trail/accept.html:50
+msgid "Go to sign"
+msgstr "Aller à la signature"
+
+#: templates/consent_trail/accept.html:54
+msgid "Signed"
+msgstr "Signé"
+
+#: templates/consent_trail/accept.html:75
+msgid "I have read and accept this document"
+msgstr "J’ai lu et j’accepte ce document"
+
+#: templates/consent_trail/accept.html:79
+msgid "Open the document first to enable this."
+msgstr "Ouvrez d'abord le document pour activer cela."
+
+#: templates/consent_trail/accept.html:85
+msgid "Accept this document"
+msgstr "Accepter ce document"
+
+#: templates/consent_trail/accept.html:91
+#, python-format
+msgid "Accepted on %(when)s"
+msgstr "Accepté le %(when)s"
+
+#: templates/consent_trail/accept.html:101
+#: templates/consent_trail/accept.html:108
+msgid "Continue"
+msgstr "Continuer"
+
+#: templates/consent_trail/accept.html:104
+#, python-format
+msgid "One document still needs your signature."
+msgid_plural "%(counter)s documents still need your signature."
+msgstr[0] "Un document attend toujours votre signature."
+msgstr[1] "%(counter)s documents attendent toujours votre signature."
+
+#: templates/consent_trail/admin/pending.html:7
+msgid "Users who have not yet accepted the current version of each document."
+msgstr "Utilisateurs qui n'ont pas encore accepté la version actuelle de chaque document."
+
+#: templates/consent_trail/admin/pending.html:13
+msgid "All"
+msgstr "Tous"
+
+#: templates/consent_trail/admin/pending.html:18
+msgid "Filter"
+msgstr "Filtrer"
+
+#: templates/consent_trail/admin/pending.html:24
+msgid "version"
+msgstr "version"
+
+#: templates/consent_trail/admin/pending.html:26
+msgid "audience"
+msgstr "public"
+
+#: templates/consent_trail/admin/pending.html:28
+msgid "pending"
+msgstr "en attente"
+
+#: templates/consent_trail/admin/pending.html:33
+msgid "User"
+msgstr "Utilisateur"
+
+#: templates/consent_trail/admin/pending.html:33
+msgid "Email"
+msgstr "E‑mail"
+
+#: templates/consent_trail/admin/pending.html:43
+msgid "previous"
+msgstr "précédent"
+
+#: templates/consent_trail/admin/pending.html:45
+#, python-format
+msgid "page %(n)s of %(t)s"
+msgstr "page %(n)s sur %(t)s"
+
+#: templates/consent_trail/admin/pending.html:47
+msgid "next"
+msgstr "Suivant"
+
+#: templates/consent_trail/admin/pending.html:52
+msgid "Everyone has accepted this version."
+msgstr "Tout le monde a accepté cette version."
+
+#: templates/consent_trail/admin/pending.html:56
+msgid "No document currently requires acceptance."
+msgstr "Aucun document ne nécessite actuellement d’acceptation."
+
+#: templates/consent_trail/base.html:10
+msgid "Legal"
+msgstr "Légal"
+
+#: templates/consent_trail/document.html:15
+msgid "in force since"
+msgstr "en vigueur depuis"
+
+#: templates/consent_trail/document.html:26
+#, python-format
+msgid "You accepted this document on %(when)s at %(at)s"
+msgstr "Vous avez accepté ce document le %(when)s à %(at)s"
+
+#: templates/consent_trail/document.html:29
+#, python-format
+msgid "you signed version %(signed)s"
+msgstr "vous avez signé la version %(signed)s"
+
+#: templates/consent_trail/document.html:45
+msgid "Print or save as PDF"
+msgstr "Imprimer ou enregistrer en PDF"
+
+#: templates/consent_trail/my_consents.html:4
+#: templates/consent_trail/my_consents.html:11
+msgid "My consents"
+msgstr "Mes consentements"
+
+#: templates/consent_trail/my_consents.html:13
+msgid "The documents you accepted, and when."
+msgstr "Les documents que vous avez acceptés, et quand."
+
+#: templates/consent_trail/my_consents.html:22
+msgid "Accepted on"
+msgstr "Accepté le"
+
+#: templates/consent_trail/my_consents.html:31
+msgid "superseded"
+msgstr "remplacé"
+
+#: templates/consent_trail/my_consents.html:41
+msgid "not accepted yet"
+msgstr "Pas encore accepté"
+
+#: templates/consent_trail/my_consents.html:46
+msgid "Nothing to show yet."
+msgstr "Rien à afficher pour le moment."

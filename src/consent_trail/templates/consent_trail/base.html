@@ -1,5 +1,7 @@
-{# Bare fallback so the app renders standalone. Host projects override
-   it via CONSENT_TRAIL_BASE_TEMPLATE — e.g. "myproject/base.html". #}
+{% comment %}
+  Bare fallback so the app renders standalone. Host projects override it via
+  CONSENT_TRAIL_BASE_TEMPLATE — e.g. "myproject/base.html".
+{% endcomment %}
 {% load i18n %}<!doctype html>
 <html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
