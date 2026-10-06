@@ -68,7 +68,7 @@ Every one is optional.
 | Setting | Default | What it does |
 |---|---|---|
 | `CONSENT_TRAIL_BASE_TEMPLATE` | `"consent_trail/base.html"` | Template the public pages extend. Point it at your own layout. |
-| `CONSENT_TRAIL_FALLBACK_LANGUAGE` | `"fr"` | Served when the requested language has no published version. |
+| `CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE` | `"fr"` | The language whose text legally prevails — served when the requested one has no published version, and named in the prevalence notice. |
 | `CONSENT_TRAIL_IP_HEADER_NAME` | `"HTTP_CF_CONNECTING_IP"` | **Read this one.** See below. |
 | `CONSENT_TRAIL_CACHE_SECONDS` | `300` | Caches "which documents currently require consent" — the middleware runs on every request. |
 | `CONSENT_TRAIL_EXCLUDE_SUPERUSERS` | `True` | Never lock an admin out of their own site over a bad flag. |
@@ -112,8 +112,18 @@ it, and the two handle different things:
 
 So each language is its own row, written and reviewed by a human, sharing one
 version number with its siblings. A document with no version in the requested
-language falls back to `CONSENT_TRAIL_FALLBACK_LANGUAGE` and displays a
+language falls back to `CONSENT_TRAIL_AUTHORITATIVE_LANGUAGE` and displays a
 prevalence notice saying which version is authoritative.
+
+The notice names that language itself, written in the reader's own language — a
+Japanese reader is told «&nbsp;only the ドイツ語 version is authoritative&nbsp;»
+when you set `"de"`. No language name is ever hardcoded: a legal notice that
+says "French" while serving German terms is a statement you cannot defend.
+
+This package ships **no language list of its own**. Which languages exist is
+whatever `LegalDocument` rows you publish; which one is shown is whatever
+`LocaleMiddleware` resolved from your `settings.LANGUAGES`. Nothing to keep in
+sync with the host project.
 
 Setting up i18n in the host project is unchanged: put the package's URLs inside
 `i18n_patterns()` if you want language-prefixed paths, and the current
@@ -128,6 +138,26 @@ urlpatterns += i18n_patterns(
 > Note: with `prefix_default_language=False`, your default language has no URL
 > prefix — `/legal/cgu/` rather than `/en/legal/cgu/`. That is Django's
 > behaviour, not this package's.
+
+### The package's own UI strings
+
+Its buttons and notices ship translated, in `consent_trail/locale/`. Django
+merges every installed app's catalogue automatically, so there is nothing to
+configure: `pip install` and the consent screen speaks your users' language.
+
+If a wording does not suit you, **override it instead of forking**. Django merges
+catalogues in this order — Django itself, then each app in `INSTALLED_APPS`, then
+`LOCALE_PATHS` — and later wins. So putting the same `msgid` in your own
+`locale/fr/LC_MESSAGES/django.po` beats ours, deterministically:
+
+```po
+msgid "Our terms have changed"
+msgstr "Nos conditions ont évolué"
+```
+
+Your `makemessages` will not pick up this package's strings, and that is correct
+— they are not yours to maintain. Only override the handful you actually want to
+reword.
 
 ## Targeting a subset of users
 

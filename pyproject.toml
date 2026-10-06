@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-consent-trail"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Versioned, multilingual legal documents for Django — with timestamped proof of who accepted what, and when."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ classifiers = [
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.2",
     "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
