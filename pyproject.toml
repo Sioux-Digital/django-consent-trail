@@ -42,3 +42,10 @@ Changelog = "https://github.com/Sioux-Digital/django-consent-trail/blob/main/CHA
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/consent_trail"]
+
+[tool.hatch.build.targets.sdist]
+# The sdist is a public download on PyPI. .gitignore alone does not protect it:
+# hatchling only honours it when building from inside a git checkout, so a build
+# from an exported tarball would put these back in. A PyPI release can never be
+# re-uploaded under the same version, so this has to be explicit.
+exclude = ["CLAUDE.md", ".github", "uv.lock"]
